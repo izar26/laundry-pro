@@ -52,6 +52,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import confetti from 'canvas-confetti';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import useSynth from '@/hooks/useSynth';
+import Fuse from 'fuse.js';
 
 // Tipe Data
 type Customer = { id: number; name: string; phone: string };
@@ -161,6 +162,20 @@ function TransactionCreate({ customers, services, promotions }: {
     const [serviceSearch, setServiceSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'kiloan' | 'satuan'>('all');
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [voiceStatus, setVoiceStatus] = useState<string>('Siap mendengarkan...');
+
+    // Fuse.js Instances
+    const serviceFuse = useMemo(() => new Fuse(services, {
+        keys: ['name', 'description'],
+        threshold: 0.4,
+        includeScore: true
+    }), [services]);
+
+    const customerFuse = useMemo(() => new Fuse(customers, {
+        keys: ['name', 'phone'],
+        threshold: 0.4,
+        includeScore: true
+    }), [customers]);
 
     // Cart State
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -174,50 +189,29 @@ function TransactionCreate({ customers, services, promotions }: {
     // Sound Hooks
     const { playSuccess, playAdd, playRemove, playError, speak } = useSynth();
 
-    // Voice Recognition
+    // Voice Handlers
     const processAddCommand = (input: string) => {
-        const lowerInput = input.toLowerCase().replace('.', ','); // Fix decimal voice input
+        setVoiceStatus(`Memproses: "${input}"...`);
+        const lowerInput = input.toLowerCase().replace('.', ','); 
         
-        // 1. Parse Quantity (e.g., "5", "5 kilo", "5.5")
-        // Regex to find number at start
         const qtyMatch = lowerInput.match(/^(\d+([.,]\d+)?)/);
         let qty = 1;
         let searchName = lowerInput;
 
         if (qtyMatch) {
             qty = parseFloat(qtyMatch[0].replace(',', '.'));
-            // Remove quantity and potential unit from search string
-            searchName = lowerInput.replace(/^(\d+([.,]\d+)?)\s*(kilo|kg|pcs|potong|set|meter)?\s*/, '').trim();
+            searchName = lowerInput.replace(/^(\d+([.,]\d+)?)\s*(kilo|kg|pcs|potong|set|meter|buah)?\s*/, '').trim();
         }
 
-        // 2. Fuzzy Search Service
-        // Simple matching: find service that contains the most words from searchName
-        const searchWords = searchName.split(' ').filter(w => w.length > 1);
+        const results = serviceFuse.search(searchName);
         
-        const scoredServices = services.map(s => {
-            const sName = s.name.toLowerCase();
-            let score = 0;
-            if (sName === searchName) score += 100; // Exact match
-            if (sName.includes(searchName)) score += 50; // Partial match
-            
-            searchWords.forEach(word => {
-                if (sName.includes(word)) score += 10;
-            });
-            return { service: s, score };
-        });
-
-        const bestMatch = scoredServices.sort((a, b) => b.score - a.score)[0];
-
-        if (bestMatch && bestMatch.score > 0) {
-            const service = bestMatch.service;
-            
+        if (results.length > 0) {
+            const service = results[0].item;
             setCart(prev => {
                 const existing = prev.find(item => item.serviceId === service.id);
                 if (existing) {
                     return prev.map(item => 
-                        item.serviceId === service.id 
-                            ? { ...item, qty: item.qty + qty }
-                            : item
+                        item.serviceId === service.id ? { ...item, qty: item.qty + qty } : item
                     );
                 }
                 return [...prev, {
@@ -229,77 +223,81 @@ function TransactionCreate({ customers, services, promotions }: {
                 }];
             });
             playAdd();
-            speak(`Oke, menambahkan ${qty} ${service.unit} ${service.name}`);
-            toast.success(`Suara: ${qty} ${service.unit} ${service.name}`);
+            const response = `Oke, ${qty} ${service.unit} ${service.name}`;
+            speak(response);
+            setVoiceStatus(response);
+            toast.success(response);
         } else {
             playError();
-            speak(`Layanan ${searchName} tidak ditemukan`);
-            toast.error(`Layanan "${searchName}" tidak ditemukan.`);
+            const msg = `Maaf, tidak menemukan layanan "${searchName}"`;
+            speak(msg);
+            setVoiceStatus(msg);
+            toast.error(msg);
         }
     };
 
     const processCustomerCommand = (name: string) => {
-        const lowerName = name.toLowerCase();
-        const customer = customers.find(c => c.name.toLowerCase().includes(lowerName));
-        
-        if (customer) {
+        setVoiceStatus(`Mencari pelanggan: "${name}"...`);
+        const results = customerFuse.search(name);
+        if (results.length > 0) {
+            const customer = results[0].item;
             setSelectedCustomer(customer);
             playSuccess();
-            speak(`Pelanggan terpilih, ${customer.name}`);
-            toast.success(`Pelanggan: ${customer.name}`);
+            const msg = `Pelanggan terpilih: ${customer.name}`;
+            speak(msg);
+            setVoiceStatus(msg);
+            toast.success(msg);
         } else {
             playError();
-            speak(`Pelanggan ${name} tidak terdaftar`);
-            toast.error(`Pelanggan "${name}" tidak ditemukan.`);
+            const msg = `Maaf, tidak menemukan pelanggan bernama ${name}`;
+            speak(msg);
+            setVoiceStatus(msg);
+            toast.error(msg);
         }
     };
 
     const commands = [
+        { command: ['tambah *', 'pesan *', 'masukkan *', 'input *'], callback: (item: string) => processAddCommand(item) },
+        { command: ['atas nama *', 'pelanggan *', 'customer *', 'pembeli *'], callback: (name: string) => processCustomerCommand(name) },
         {
-            command: 'tambah *',
-            callback: (item: string) => processAddCommand(item)
-        },
-        {
-            command: 'pesan *', // Alternative for 'tambah'
-            callback: (item: string) => processAddCommand(item)
-        },
-        {
-            command: 'atas nama *',
-            callback: (name: string) => processCustomerCommand(name)
-        },
-        {
-            command: 'pelanggan *',
-            callback: (name: string) => processCustomerCommand(name)
-        },
-        {
-            command: 'hapus *',
+            command: ['hapus *', 'buang *', 'cancel *'],
             callback: (item: string) => {
-                const cartItem = cart.find(c => c.name.toLowerCase().includes(item.toLowerCase()));
-                if (cartItem) {
+                const cartFuse = new Fuse(cart, { keys: ['name'], threshold: 0.4 });
+                const results = cartFuse.search(item);
+                if (results.length > 0) {
+                    const cartItem = results[0].item;
                     removeItem(cartItem.serviceId);
-                    toast.success(`Dihapus: ${cartItem.name}`);
+                    const msg = `Menghapus ${cartItem.name}`;
+                    speak(msg);
+                    setVoiceStatus(msg);
+                    toast.success(msg);
+                } else {
+                    speak("Barang tidak ada di keranjang");
                 }
             }
         },
         {
-            command: ['bayar', 'checkout', 'selesai', 'proses'],
+            command: ['bayar', 'checkout', 'selesai', 'proses', 'transaksi'],
             callback: () => {
                 if (cart.length > 0 && selectedCustomer) {
-                    speak("Siap, memulai proses pembayaran");
+                    speak("Siap, memproses pembayaran");
+                    setVoiceStatus("Memproses Pembayaran...");
                     handleCheckout();
                 } else {
                     playError();
-                    speak("Maaf, keranjang masih kosong atau pelanggan belum dipilih");
-                    toast.error("Gagal: Cek keranjang/pelanggan.");
+                    let msg = "Gagal. Keranjang kosong atau pelanggan belum dipilih.";
+                    speak(msg);
+                    setVoiceStatus(msg);
+                    toast.error(msg);
                 }
             }
         },
         {
-            command: ['batal', 'tutup', 'stop', 'berhenti'],
+            command: ['batal', 'tutup', 'stop', 'berhenti', 'matikan'],
             callback: () => {
-                speak("Perintah suara dihentikan");
+                speak("Mikrofon dimatikan");
                 SpeechRecognition.stopListening();
-                toast.info("Suara dinonaktifkan.");
+                setVoiceStatus("Nonaktif");
             }
         },
         {
@@ -308,99 +306,86 @@ function TransactionCreate({ customers, services, promotions }: {
                 if(confirm('Reset keranjang?')) {
                     setCart([]);
                     playRemove();
+                    speak("Keranjang dikosongkan");
                 }
+            }
+        },
+        {
+            command: '*',
+            callback: (command: string) => {
+                if (!command || command.length < 2) return;
+                setVoiceStatus(`Tidak mengerti: "${command}"`);
             }
         }
     ];
 
     const { transcript, listening, browserSupportsSpeechRecognition, isMicrophoneAvailable } = useSpeechRecognition({ commands });
 
-    // Toggle Mic
+    useEffect(() => {
+        if (listening) {
+            if (transcript) setVoiceStatus(`Mendengar: "${transcript}"`);
+            else setVoiceStatus("Mendengarkan...");
+        }
+    }, [transcript, listening]);
+
     const toggleMic = () => {
         if (listening) {
             SpeechRecognition.stopListening();
         } else {
-            // Cek Secure Context
-            if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                toast.error("Fitur Suara memerlukan HTTPS atau Localhost!", { 
-                    description: "Browser memblokir mikrofon di koneksi HTTP biasa." 
-                });
-                // Tetap coba buka untuk menampilkan error di overlay
+            if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+                toast.error("Fitur Suara memerlukan HTTPS atau Localhost!");
             }
             SpeechRecognition.startListening({ continuous: true, language: 'id-ID' });
-            toast.info("Mendengarkan...", { description: "Coba: 'Tambah 5 kilo Cuci Komplit' atau 'Atas nama Budi'" });
+            toast.info("Mendengarkan...", { description: "Coba: 'Tambah 5 kilo Cuci Komplit'" });
         }
     };
 
     // Hotkeys
     useHotkeys('ctrl+f', (e) => { e.preventDefault(); searchInputRef.current?.focus(); });
-    useHotkeys('esc', () => setServiceSearch(''));
-    useHotkeys('ctrl+enter', () => { if(cart.length > 0 && selectedCustomer) handleCheckout(); });
     useHotkeys('ctrl+m', (e) => { e.preventDefault(); toggleMic(); });
+    useHotkeys('ctrl+enter', () => { if(cart.length > 0 && selectedCustomer) handleCheckout(); });
 
     // Load Midtrans
     useEffect(() => {
         if (!midtrans_client_key) return;
-        const snapScript = "https://app.sandbox.midtrans.com/snap/snap.js";
         const script = document.createElement("script");
-        script.src = snapScript;
+        script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
         script.setAttribute("data-client-key", midtrans_client_key);
         script.async = true;
         document.body.appendChild(script);
         return () => { if (document.body.contains(script)) document.body.removeChild(script); };
     }, [midtrans_client_key]);
 
-    // Filter Services
     const filteredServices = services.filter(service => {
         const matchesSearch = service.name.toLowerCase().includes(serviceSearch.toLowerCase());
-        const matchesCategory = categoryFilter === 'all' 
-            ? true 
-            : categoryFilter === 'kiloan' 
-                ? (service.unit === 'kg' || service.unit === 'meter') 
-                : (service.unit === 'pcs' || service.unit === 'set');
+        const matchesCategory = categoryFilter === 'all' ? true : categoryFilter === 'kiloan' ? (service.unit === 'kg' || service.unit === 'meter') : (service.unit === 'pcs' || service.unit === 'set');
         return matchesSearch && matchesCategory;
     });
 
     const addToCart = (service: Service) => {
         setCart(prev => {
             const existing = prev.find(item => item.serviceId === service.id);
-            if (existing) {
-                return prev.map(item => 
-                    item.serviceId === service.id 
-                        ? { ...item, qty: item.qty + 1 }
-                        : item
-                );
-            }
-            return [...prev, {
-                serviceId: service.id,
-                name: service.name,
-                price: parseFloat(service.price),
-                unit: service.unit,
-                qty: 1
-            }];
+            if (existing) return prev.map(item => item.serviceId === service.id ? { ...item, qty: item.qty + 1 } : item);
+            return [...prev, { serviceId: service.id, name: service.name, price: parseFloat(service.price), unit: service.unit, qty: 1 }];
         });
-        playAdd(); // SFX
-        toast.success(`${service.name} ditambahkan.`, { position: 'bottom-center' });
+        playAdd();
+        toast.success(`${service.name} ditambahkan.`);
     };
 
     const updateQty = (id: number, delta: number) => {
         setCart(prev => prev.map(item => {
             if (item.serviceId === id) {
-                let step = 0.5;
-                if (item.unit === 'pcs' || item.unit === 'set') step = 1;
-                const isIncrement = delta > 0;
-                const changeAmount = isIncrement ? step : -step;
-                const newQty = Math.max(step, item.qty + changeAmount);
-                return { ...item, qty: newQty };
+                let step = (item.unit === 'pcs' || item.unit === 'set') ? 1 : 0.5;
+                return { ...item, qty: Math.max(step, item.qty + (delta > 0 ? step : -step)) };
             }
             return item;
         }));
-        playAdd(); // SFX
+        playAdd();
     };
 
     const removeItem = (id: number) => {
         setCart(prev => prev.filter(item => item.serviceId !== id));
-        playRemove(); // SFX
+        playRemove();
     };
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
@@ -417,17 +402,12 @@ function TransactionCreate({ customers, services, promotions }: {
             }
             return p.type === 'percentage' ? baseVal * (parseFloat(p.value) / 100) : parseFloat(p.value);
         };
-
         if (appliedPromo) disc += calculatePromoValue(appliedPromo);
-
-        const autoPromos = promotions.filter(p => !p.code);
-        autoPromos.forEach(p => {
-            let eligible = true;
-            if (p.min_amount && subtotal < parseFloat(p.min_amount)) eligible = false;
-            if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) eligible = false;
-            if (eligible) disc += calculatePromoValue(p);
+        promotions.filter(p => !p.code).forEach(p => {
+            if ((!p.min_amount || subtotal >= parseFloat(p.min_amount)) && (!p.min_weight || totalWeightKg >= parseFloat(p.min_weight))) {
+                disc += calculatePromoValue(p);
+            }
         });
-
         return Math.min(disc, subtotal);
     }, [cart, appliedPromo, subtotal, totalWeightKg, promotions]);
 
@@ -435,410 +415,151 @@ function TransactionCreate({ customers, services, promotions }: {
 
     const applyPromoCode = () => {
         const promo = promotions.find(p => p.code === promoCode.toUpperCase());
-        if (promo) {
-            setAppliedPromo(promo);
-            playSuccess(); // SFX
-            toast.success("Kode promo diterapkan!");
-        } else {
-            playError();
-            toast.error("Kode promo tidak valid.");
-            setAppliedPromo(null);
-        }
+        if (promo) { setAppliedPromo(promo); playSuccess(); toast.success("Promo OK!"); }
+        else { playError(); toast.error("Promo Gagal!"); setAppliedPromo(null); }
     };
 
     const handleCheckout = async () => {
-        if (!selectedCustomer) {
-            playError();
-            toast.error("Pilih pelanggan terlebih dahulu.");
-            return;
-        }
-        if (cart.length === 0) {
-            playError();
-            toast.error("Keranjang masih kosong.");
-            return;
-        }
-
+        if (!selectedCustomer || cart.length === 0) return;
         setIsProcessing(true);
-
         try {
-            const payload = {
-                customer_id: selectedCustomer.id,
-                items: cart.map(item => ({ service_id: item.serviceId, qty: item.qty })),
-                promo_code: appliedPromo?.code || null,
-                payment_method: paymentMethod
-            };
-
-            const response = await window.axios.post(route('transactions.store'), payload);
-            const { snap_token, transaction } = response.data;
-
+            const payload = { customer_id: selectedCustomer.id, items: cart.map(item => ({ service_id: item.serviceId, qty: item.qty })), promo_code: appliedPromo?.code || null, payment_method: paymentMethod };
+            const response = await (window as any).axios.post(route('transactions.store'), payload);
+            const { snap_token } = response.data;
             if (paymentMethod === 'midtrans' && snap_token) {
-                window.snap.pay(snap_token, {
-                    onSuccess: function(){
-                        playSuccess(); // SFX
-                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-                        // Toast dihapus, biarkan backend yang handle setelah redirect
-                    },
-                    onPending: function(){
-                        toast.info("Menunggu pembayaran...");
-                        router.visit(route('transactions.index'));
-                    },
-                    onError: function(){ 
-                        playError();
-                        toast.error("Pembayaran gagal!"); 
-                    },
-                    onClose: function(){ toast.warning("Popup ditutup."); }
+                (window as any).snap.pay(snap_token, {
+                    onSuccess: () => { playSuccess(); confetti(); router.visit(route('transactions.index')); },
+                    onPending: () => router.visit(route('transactions.index')),
+                    onError: () => playError()
                 });
             } else {
-                playSuccess(); // SFX
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-                toast.success("Transaksi Cash Berhasil!");
-                router.visit(route('transactions.index'));
+                playSuccess(); confetti(); toast.success("Berhasil!"); router.visit(route('transactions.index'));
             }
-        } catch (error: any) {
-            playError();
-            toast.error("Gagal: " + (error.response?.data?.message || "Error"));
-        } finally {
-            setIsProcessing(false);
-        }
+        } catch (e: any) { playError(); toast.error("Error: " + (e.response?.data?.message || "Gagal")); }
+        finally { setIsProcessing(false); }
     };
 
     const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
     return (
         <>
-            <Head title="Buat Transaksi Baru (POS)" />
-            
+            <Head title="POS - Kasir Suara" />
             <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
-                {/* KIRI: Katalog Layanan */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <div className="mb-4 flex justify-between items-center pr-2">
                         <div>
-                            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                                Kasir (POS) 
-                            </h2>
-                            <p className="text-muted-foreground text-sm">Pilih layanan. Tekan <kbd className="bg-muted px-1 rounded text-xs">Ctrl+F</kbd> cari, <kbd className="bg-muted px-1 rounded text-xs">Ctrl+M</kbd> suara.</p>
+                            <h2 className="text-2xl font-bold tracking-tight">Kasir (POS)</h2>
+                            <p className="text-muted-foreground text-sm flex items-center gap-2">
+                                <Keyboard className="h-3 w-3" /> Ctrl+F cari, Ctrl+M suara
+                            </p>
                         </div>
                         <div className="flex gap-2">
-                            <Button 
-                                variant={listening ? "destructive" : "outline"} 
-                                size="icon" 
-                                onClick={toggleMic}
-                                title={listening ? "Matikan Mic" : "Aktifkan Perintah Suara"}
-                            >
+                            <Button variant={listening ? "destructive" : "outline"} size="icon" onClick={toggleMic}>
                                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                             </Button>
-                            <Button variant="ghost" onClick={() => window.history.back()}>
-                                <ArrowLeft className="h-4 w-4 mr-2"/> Kembali
-                            </Button>
+                            <Button variant="ghost" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2"/> Kembali</Button>
                         </div>
                     </div>
 
                     <div className="flex gap-2 mb-4 pr-2">
                         <div className="relative flex-1">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                ref={searchInputRef}
-                                placeholder="Cari layanan..." 
-                                className="pl-9 transition-all focus:ring-2 focus:ring-primary/20"
-                                value={serviceSearch}
-                                onChange={(e) => setServiceSearch(e.target.value)}
-                            />
+                            <Input ref={searchInputRef} placeholder="Cari layanan..." className="pl-9" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} />
                         </div>
                         <div className="flex bg-muted rounded-md p-1 gap-1">
                             {['all', 'kiloan', 'satuan'].map(tab => (
-                                <button 
-                                    key={tab}
-                                    onClick={() => setCategoryFilter(tab as any)}
-                                    className={cn("px-3 text-xs font-medium rounded-sm transition-all capitalize", categoryFilter === tab ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                                >
-                                    {tab}
-                                </button>
+                                <button key={tab} onClick={() => setCategoryFilter(tab as any)} className={cn("px-3 text-xs font-medium rounded-sm capitalize", categoryFilter === tab ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>{tab}</button>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pr-2 pb-4 scroll-smooth">
-                        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex-1 overflow-y-auto pr-2 pb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <AnimatePresence>
                                 {filteredServices.map(service => (
-                                    <motion.div
-                                        layout
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.9 }}
-                                        key={service.id}
-                                    >
-                                        <SpotlightCard className="cursor-pointer hover:border-primary hover:shadow-md transition-all group active:scale-[0.98] flex flex-col justify-between h-full" spotlightColor="rgba(59, 130, 246, 0.15)">
-                                            <div onClick={() => addToCart(service)} className="h-full flex flex-col justify-between relative z-10">
+                                    <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key={service.id}>
+                                        <SpotlightCard className="cursor-pointer hover:border-primary transition-all group">
+                                            <div onClick={() => addToCart(service)}>
                                                 <CardHeader className="p-4 pb-2">
                                                     <div className="flex justify-between items-start">
-                                                        <CardTitle className="text-base group-hover:text-primary transition-colors line-clamp-1">{service.name}</CardTitle>
-                                                        <Badge variant="secondary" className="text-[10px] h-5">/{service.unit}</Badge>
+                                                        <CardTitle className="text-base group-hover:text-primary line-clamp-1">{service.name}</CardTitle>
+                                                        <Badge variant="secondary" className="text-[10px]">/{service.unit}</Badge>
                                                     </div>
-                                                    <CardDescription className="text-xs line-clamp-2 h-[2.5em]">
-                                                        {service.description || 'Tidak ada deskripsi'}
-                                                    </CardDescription>
                                                 </CardHeader>
-                                                <CardFooter className="p-4 pt-0 mt-2">
-                                                    <div className="w-full flex items-center justify-between font-bold text-lg">
-                                                        {formatRupiah(parseFloat(service.price))}
-                                                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                                            <Plus className="h-4 w-4" />
-                                                        </div>
-                                                    </div>
+                                                <CardFooter className="p-4 pt-0 mt-2 flex justify-between items-center">
+                                                    <span className="font-bold">{formatRupiah(parseFloat(service.price))}</span>
+                                                    <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors"><Plus className="h-4 w-4" /></div>
                                                 </CardFooter>
                                             </div>
                                         </SpotlightCard>
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
-                        </motion.div>
-                        {filteredServices.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-                                <p>Layanan tidak ditemukan.</p>
-                            </div>
-                        )}
-                        {/* Voice Hint Overlay */}
+                        </div>
+                        
+                        {/* Panel Asisten Suara (Modern & Non-Blocking) */}
                         <AnimatePresence>
                             {listening && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                                >
-                                    <div className="flex flex-col items-center gap-6 p-8 rounded-3xl bg-background/90 border border-white/10 shadow-2xl max-w-2xl w-full mx-4">
-                                        
-                                        {/* Animation Icon */}
-                                        <div className="relative flex items-center justify-center h-20 w-20">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500/20"></span>
-                                            <div className="relative flex items-center justify-center h-16 w-16 bg-red-500 rounded-full shadow-lg shadow-red-500/50">
-                                                <Mic className="h-8 w-8 text-white animate-pulse" />
-                                            </div>
+                                <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-6 left-0 right-0 z-[100] flex justify-center px-4">
+                                    <div className="bg-zinc-900/95 dark:bg-zinc-100/95 text-white dark:text-black backdrop-blur shadow-2xl rounded-2xl p-4 flex items-center gap-4 max-w-xl w-full border border-white/10">
+                                        <div className="relative h-10 w-10 flex items-center justify-center bg-red-500 rounded-full">
+                                            <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50"></span>
+                                            <Mic className="h-5 w-5 text-white relative z-10" />
                                         </div>
-
-                                        {/* Text Feedback */}
-                                        <div className="text-center space-y-2 w-full">
-                                            <h3 className="text-2xl font-bold text-foreground">Mendengarkan...</h3>
-                                            
-                                            {/* Security/Mic Warning */}
-                                            {(!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') && (
-                                                <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20 mb-2">
-                                                    <strong>PERINGATAN:</strong> Mikrofon diblokir oleh Browser! <br/>
-                                                    Fitur suara TIDAK BERFUNGSI di koneksi HTTP (IP Address). <br/>
-                                                    Silakan akses lewat <code>http://localhost:5173</code> atau gunakan HTTPS.
-                                                </div>
-                                            )}
-
-                                            {!isMicrophoneAvailable && (
-                                                <div className="bg-orange-500/10 text-orange-600 text-sm p-3 rounded-lg border border-orange-500/20 mb-2">
-                                                    <strong>Akses Mikrofon Ditolak/Tidak Tersedia.</strong> <br/>
-                                                    Mohon izinkan akses mikrofon di pengaturan browser.
-                                                </div>
-                                            )}
-
-                                            <div className="min-h-[60px] flex items-center justify-center">
-                                                {transcript ? (
-                                                    <p className="text-xl md:text-3xl font-medium text-primary break-words leading-relaxed">
-                                                        "{transcript}"
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-muted-foreground italic text-lg animate-pulse">
-                                                        Silakan bicara...
-                                                    </p>
-                                                )}
-                                            </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold uppercase opacity-50">Sistem Mendengar</p>
+                                            <p className="text-lg font-medium truncate">{voiceStatus}</p>
                                         </div>
-
-                                        {/* Guide Chips */}
-                                        <div className="flex flex-wrap justify-center gap-2 mt-4">
-                                            <Badge variant="secondary" className="px-3 py-1.5 text-sm pointer-events-none opacity-80">"Tambah 5 kg Cuci Komplit"</Badge>
-                                            <Badge variant="secondary" className="px-3 py-1.5 text-sm pointer-events-none opacity-80">"Atas nama Budi"</Badge>
-                                            <Badge variant="secondary" className="px-3 py-1.5 text-sm pointer-events-none opacity-80">"Bayar"</Badge>
-                                        </div>
-
-                                        {/* Close Button */}
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="mt-2 text-muted-foreground hover:text-destructive"
-                                            onClick={toggleMic}
-                                        >
-                                            <MicOff className="mr-2 h-4 w-4" /> Batalkan (Klik tombol mic atau sebut "Batal")
-                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={toggleMic} className="rounded-full hover:bg-white/10"><MicOff className="h-5 w-5" /></Button>
                                     </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {!browserSupportsSpeechRecognition && (
-                            <div className="fixed bottom-4 right-4 z-50 bg-destructive text-destructive-foreground px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
-                                <MicOff className="h-5 w-5" />
-                                <span className="font-medium">Browser Anda tidak mendukung fitur suara. Gunakan Chrome.</span>
+                        {(!window.isSecureContext && window.location.hostname !== 'localhost') && (
+                            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-destructive text-white p-4 rounded-xl shadow-2xl text-center">
+                                <strong>Gunakan Localhost atau HTTPS!</strong><br/>Browser memblokir mic di alamat IP.
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* KANAN: Cart & Checkout */}
-                <div className="w-full md:w-[400px] flex flex-col bg-card border rounded-xl shadow-lg h-full overflow-hidden shrink-0">
+                {/* KANAN: Cart */}
+                <div className="w-full md:w-[380px] flex flex-col bg-card border rounded-xl shadow-lg h-full overflow-hidden">
                     <div className="p-4 border-b bg-muted/30">
-                        <Label className="mb-2 block text-xs font-uppercase text-muted-foreground font-bold tracking-wider">PELANGGAN</Label>
+                        <Label className="text-xs font-bold text-muted-foreground uppercase mb-2 block">Pelanggan</Label>
                         <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                             <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={openCombobox}
-                                    className="w-full justify-between bg-background"
-                                >
-                                    {selectedCustomer
-                                        ? <span className="font-medium">{selectedCustomer.name}</span>
-                                        : <span className="text-muted-foreground font-normal">Pilih Pelanggan...</span>}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
+                                <Button variant="outline" className="w-full justify-between bg-background">{selectedCustomer ? selectedCustomer.name : "Pilih Pelanggan..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[360px] p-0">
+                            <PopoverContent className="w-[340px] p-0">
                                 <Command>
-                                    <CommandInput placeholder="Cari nama atau no hp..." />
+                                    <CommandInput placeholder="Cari..." />
                                     <CommandList>
-                                        <CommandEmpty>Pelanggan tidak ditemukan.</CommandEmpty>
-                                        <CommandGroup>
-                                            {customers.map((customer) => (
-                                                <CommandItem
-                                                    key={customer.id}
-                                                    value={`${customer.name} ${customer.phone}`}
-                                                    onSelect={() => {
-                                                        setSelectedCustomer(customer);
-                                                        setOpenCombobox(false);
-                                                    }}
-                                                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedCustomer(customer); setOpenCombobox(false); }}
-                                                >
-                                                    <Check className={cn("mr-2 h-4 w-4", selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0")} />
-                                                    <div className="flex flex-col">
-                                                        <span>{customer.name}</span>
-                                                        <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
+                                        <CommandEmpty>Tidak ada.</CommandEmpty>
+                                        <CommandGroup>{customers.map(c => <CommandItem key={c.id} onSelect={() => { setSelectedCustomer(c); setOpenCombobox(false); }}>{c.name}</CommandItem>)}</CommandGroup>
                                     </CommandList>
                                 </Command>
                             </PopoverContent>
                         </Popover>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/20">
-                        <AnimatePresence mode="popLayout">
-                            {cart.length === 0 ? (
-                                <motion.div 
-                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                    className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-40 space-y-2"
-                                >
-                                    <ShoppingCart className="h-16 w-16" />
-                                    <p className="text-sm font-medium">Keranjang kosong</p>
-                                </motion.div>
-                            ) : (
-                                cart.map(item => (
-                                    <CartItemRow 
-                                        key={item.serviceId} 
-                                        item={item} 
-                                        updateQty={updateQty} 
-                                        removeItem={removeItem} 
-                                    />
-                                ))
-                            )}
-                        </AnimatePresence>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50 dark:bg-slate-900/20">
+                        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} />)}
                     </div>
 
-                    <div className="p-4 border-t bg-background shadow-up-lg z-10">
-                        <div className="flex gap-2 mb-4">
-                            <Input 
-                                placeholder="Kode Voucher" 
-                                value={promoCode}
-                                onChange={(e) => setPromoCode(e.target.value)}
-                                className="h-9 text-xs font-mono uppercase bg-muted/30 border-dashed"
-                            />
-                            <Button size="sm" variant="secondary" onClick={applyPromoCode} className="h-9 text-xs">Pakai</Button>
-                        </div>
-                        
-                        <AnimatePresence>
-                            {appliedPromo && (
-                                <motion.div 
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="flex justify-between items-center text-xs bg-emerald-50 text-emerald-700 px-3 py-2 rounded-md border border-emerald-200 mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <Check className="h-3 w-3" />
-                                            <span className="font-medium">Hemat {appliedPromo.type === 'percentage' ? `${parseFloat(appliedPromo.value)}%` : formatRupiah(parseFloat(appliedPromo.value))}</span>
-                                        </div>
-                                        <button onClick={() => setAppliedPromo(null)} className="font-bold hover:underline opacity-70 hover:opacity-100">Hapus</button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
+                    <div className="p-4 border-t bg-background">
                         <div className="space-y-2 text-sm mb-4">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatRupiah(subtotal)}</span>
-                            </div>
-                            {discount > 0 && (
-                                <div className="flex justify-between text-emerald-600 font-medium">
-                                    <span>Diskon</span>
-                                    <span>- {formatRupiah(discount)}</span>
-                                </div>
-                            )}
+                            <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
+                            {discount > 0 && <div className="flex justify-between text-emerald-600 font-bold"><span>Diskon</span><span>-{formatRupiah(discount)}</span></div>}
                             <Separator />
-                            <div className="flex justify-between text-xl font-bold pt-1">
-                                <span>Total</span>
-                                <span className="text-primary flex items-center">
-                                    <RollingNumber value={total} />
-                                </span>
-                            </div>
+                            <div className="flex justify-between text-xl font-bold pt-1"><span>Total</span><span className="text-primary"><RollingNumber value={total} /></span></div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                className={cn(
-                                    "flex flex-col items-center justify-center gap-1 border rounded-lg p-2 transition-all border-2",
-                                    paymentMethod === 'cash' ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-muted hover:border-foreground/20 hover:bg-muted/50"
-                                )}
-                                onClick={() => setPaymentMethod('cash')}
-                            >
-                                <Banknote className="h-5 w-5" />
-                                <span className="text-xs font-bold">Tunai</span>
-                            </motion.button>
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                className={cn(
-                                    "flex flex-col items-center justify-center gap-1 border rounded-lg p-2 transition-all border-2",
-                                    paymentMethod === 'midtrans' ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-muted hover:border-foreground/20 hover:bg-muted/50"
-                                )}
-                                onClick={() => setPaymentMethod('midtrans')}
-                            >
-                                <CreditCard className="h-5 w-5" />
-                                <span className="text-xs font-bold">QRIS / Bank</span>
-                            </motion.button>
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-2 gap-1"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
+                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">QRIS</span></Button>
                         </div>
-
-                        <div className="relative">
-                            <Button 
-                                className="w-full text-md font-bold h-12 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98]" 
-                                size="lg" 
-                                onClick={handleCheckout}
-                                disabled={isProcessing || cart.length === 0 || !selectedCustomer}
-                            >
-                                {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : `Bayar Sekarang`}
-                            </Button>
-                            <div className="absolute -bottom-6 left-0 right-0 text-center text-[10px] text-muted-foreground flex justify-center items-center gap-1">
-                                <Keyboard className="h-3 w-3" /> Ctrl+Enter bayar • Ctrl+M suara
-                            </div>
-                        </div>
+                        <Button className="w-full h-12 font-bold text-lg" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
                     </div>
                 </div>
             </div>
