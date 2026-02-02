@@ -30,7 +30,7 @@ class TransactionSeeder extends Seeder
             return;
         }
 
-        $totalTransactions = 200;
+        $totalTransactions = 2000;
 
         for ($i = 0; $i < $totalTransactions; $i++) {
             // Random Tanggal (1 Tahun Terakhir)

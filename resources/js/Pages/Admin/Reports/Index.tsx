@@ -134,7 +134,7 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
                                 {startDate ? format(startDate, "dd MMM yyyy") : <span>Mulai</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={startDate} onSelect={setStartDate} /></PopoverContent>
                     </Popover>
                     <span className="text-muted-foreground">-</span>
                     <Popover>
@@ -144,7 +144,7 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
                                 {endDate ? format(endDate, "dd MMM yyyy") : <span>Selesai</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={endDate} onSelect={setEndDate} disabled={(date) => startDate ? date < startDate : false} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={endDate} onSelect={setEndDate} disabled={(date) => startDate ? date < startDate : false} /></PopoverContent>
                     </Popover>
 
                     <Button size="sm" onClick={handleFilter} className="h-8">Terapkan</Button>
@@ -232,8 +232,8 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
             </Card>
 
             {/* Grafik */}
-            <div className="grid gap-6 md:grid-cols-7 mb-6">
-                <Card className="md:col-span-4 border-none shadow-md">
+            <div className="flex flex-col gap-6 mb-6">
+                <Card className="border-none shadow-md">
                     <CardHeader>
                         <CardTitle>Tren Pendapatan (Area Chart)</CardTitle>
                     </CardHeader>
@@ -281,7 +281,7 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
                     </CardContent>
                 </Card>
 
-                <Card className="md:col-span-3 border-none shadow-md">
+                <Card className="border-none shadow-md">
                     <CardHeader>
                         <CardTitle>Top 5 Layanan Terlaris</CardTitle>
                     </CardHeader>
@@ -299,7 +299,7 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
                                         <YAxis 
                                             dataKey="service_name" 
                                             type="category" 
-                                            width={100}
+                                            width={200}
                                             tick={{ fontSize: 11 }}
                                             interval={0}
                                         />
