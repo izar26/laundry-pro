@@ -47,6 +47,19 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
     const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
     const isPelanggan = stats.is_pelanggan;
 
+    const translateStatus = (status: string) => {
+        const map: Record<string, string> = {
+            'new': 'Baru',
+            'process': 'Proses',
+            'ready': 'Siap',
+            'done': 'Selesai',
+            'cancelled': 'Batal',
+            'unpaid': 'Belum Lunas',
+            'paid': 'Lunas',
+        };
+        return map[status] || status;
+    };
+
     return (
         <>
             <Head title="Dashboard" />
@@ -158,7 +171,7 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
                                                     transaction.status === 'done' ? 'text-emerald-600 border-emerald-200 bg-emerald-50' : 
                                                     transaction.status === 'ready' ? 'text-orange-600 border-orange-200 bg-orange-50' : 'text-blue-600 border-blue-200 bg-blue-50'
                                                 }`}>
-                                                    {transaction.status}
+                                                    {translateStatus(transaction.status)}
                                                 </Badge>
                                             </div>
                                         </div>
