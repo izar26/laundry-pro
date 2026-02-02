@@ -3,26 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeController extends Controller
 {
     public function index(Request $request)
     {
-        // Hanya ambil user dengan role 'pegawai'
-        $query = User::role('pegawai');
+        // Ambil data dari tabel employees beserta relasi user dan roles
+        $query = Employee::with(['user.roles']);
 
         if ($request->has('search')) {
-            $query->where(function($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%");
-            });
+            $search = $request->search;
+            $query->whereHas('user', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            })->orWhere('nip', 'like', "%{$search}%");
         }
 
-        $employees = $query->latest()->paginate(10)->withQueryString();
+        // Urutkan: Owner -> Administrator -> Lainnya -> Terbaru
+        $employees = $query->orderByRaw("
+            CASE 
+                WHEN position = 'Owner' THEN 1 
+                WHEN position = 'Administrator' THEN 2 
+                ELSE 3 
+            END ASC
+        ")->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('Admin/Employees/Index', [
             'employees' => $employees,
@@ -33,53 +43,96 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            // Data User
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
+            // Data Employee
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'nip' => 'nullable|string|max:20|unique:employees',
+            'position' => 'nullable|string|max:50',
+            'salary' => 'nullable|numeric|min:0',
+            'join_date' => 'nullable|date',
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'email_verified_at' => now(), // Auto verify agar bisa login
-        ]);
+        DB::transaction(function () use ($validated) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'avatar' => null, // Default
+                'email_verified_at' => now(),
+            ]);
 
-        $user->assignRole('pegawai');
+            $user->assignRole('pegawai');
+
+            Employee::create([
+                'user_id' => $user->id,
+                'phone' => $validated['phone'],
+                'address' => $validated['address'],
+                'nip' => $validated['nip'],
+                'position' => $validated['position'] ?? 'Staff',
+                'salary' => $validated['salary'] ?? 0,
+                'join_date' => $validated['join_date'] ?? now(),
+            ]);
+        });
 
         return redirect()->back()->with('message', 'Pegawai berhasil ditambahkan.');
     }
 
-    public function update(Request $request, User $employee)
+    public function update(Request $request, $id)
     {
-        // Validasi, password opsional saat update
+        $employee = Employee::with('user')->findOrFail($id);
+        $user = $employee->user;
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($employee->id)],
+            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'nip' => ['nullable', 'string', Rule::unique('employees')->ignore($employee->id)],
+            'position' => 'nullable|string|max:50',
+            'salary' => 'nullable|numeric|min:0',
+            'join_date' => 'nullable|date',
         ]);
 
-        $data = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ];
+        DB::transaction(function () use ($user, $employee, $validated, $request) {
+            // Update User
+            $userData = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ];
+            if ($request->filled('password')) {
+                $userData['password'] = Hash::make($validated['password']);
+            }
+            $user->update($userData);
 
-        if ($request->filled('password')) {
-            $data['password'] = Hash::make($validated['password']);
-        }
-
-        $employee->update($data);
+            // Update Employee
+            $employee->update([
+                'phone' => $validated['phone'],
+                'address' => $validated['address'],
+                'nip' => $validated['nip'],
+                'position' => $validated['position'],
+                'salary' => $validated['salary'],
+                'join_date' => $validated['join_date'],
+            ]);
+        });
 
         return redirect()->back()->with('message', 'Data pegawai diperbarui.');
     }
 
-    public function destroy(User $employee)
+    public function destroy($id)
     {
-        if ($employee->hasRole('admin')) {
+        $employee = Employee::findOrFail($id);
+        $user = $employee->user;
+
+        if ($user->hasRole('admin')) {
              return redirect()->back()->withErrors(['message' => 'Tidak bisa menghapus admin utama.']);
         }
         
-        $employee->delete();
+        $user->delete(); // Ini akan men-trigger delete cascade ke employees
 
         return redirect()->back()->with('message', 'Pegawai dihapus.');
     }

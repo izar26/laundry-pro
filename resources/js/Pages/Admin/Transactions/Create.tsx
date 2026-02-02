@@ -156,7 +156,9 @@ function TransactionCreate({ customers, services, promotions }: {
     services: Service[], 
     promotions: Promotion[] 
 }) {
-    const { midtrans_client_key } = usePage().props as any;
+    const { midtrans_client_key, auth } = usePage().props as any;
+    const user = auth.user;
+    const isCustomerRole = user.roles?.includes('pelanggan');
     
     // UI State
     const [serviceSearch, setServiceSearch] = useState('');
@@ -179,7 +181,25 @@ function TransactionCreate({ customers, services, promotions }: {
 
     // Cart State
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    
+    // Auto-select customer for 'pelanggan' role
+    const initialCustomer = useMemo(() => {
+        if (isCustomerRole) {
+            // customers prop sekarang berisi array object dengan property user_id
+            // Kita cocokkan user_id dari list dengan id user yang login
+            const found = customers.find(c => (c as any).user_id === user.id);
+            return found || null;
+        }
+        return null;
+    }, [isCustomerRole, customers, user]);
+
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(initialCustomer);
+    
+    // Update selectedCustomer if initialCustomer changes (e.g. data loaded)
+    useEffect(() => {
+        if (initialCustomer) setSelectedCustomer(initialCustomer);
+    }, [initialCustomer]);
+
     const [openCombobox, setOpenCombobox] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
     const [promoCode, setPromoCode] = useState('');
@@ -528,20 +548,27 @@ function TransactionCreate({ customers, services, promotions }: {
                 <div className="w-full md:w-[380px] flex flex-col bg-card border rounded-xl shadow-lg h-full overflow-hidden">
                     <div className="p-4 border-b bg-muted/30">
                         <Label className="text-xs font-bold text-muted-foreground uppercase mb-2 block">Pelanggan</Label>
-                        <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-between bg-background">{selectedCustomer ? selectedCustomer.name : "Pilih Pelanggan..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[340px] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Cari..." />
-                                    <CommandList>
-                                        <CommandEmpty>Tidak ada.</CommandEmpty>
-                                        <CommandGroup>{customers.map(c => <CommandItem key={c.id} onSelect={() => { setSelectedCustomer(c); setOpenCombobox(false); }}>{c.name}</CommandItem>)}</CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                        {isCustomerRole ? (
+                            <div className="p-2 bg-background border rounded-md font-medium text-sm flex justify-between items-center">
+                                <span>{selectedCustomer?.name || user.name}</span>
+                                <Badge variant="secondary" className="text-[10px]">Anda</Badge>
+                            </div>
+                        ) : (
+                            <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between bg-background">{selectedCustomer ? selectedCustomer.name : "Pilih Pelanggan..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[340px] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Cari..." />
+                                        <CommandList>
+                                            <CommandEmpty>Tidak ada.</CommandEmpty>
+                                            <CommandGroup>{customers.map(c => <CommandItem key={c.id} onSelect={() => { setSelectedCustomer(c); setOpenCombobox(false); }}>{c.name}</CommandItem>)}</CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50 dark:bg-slate-900/20">

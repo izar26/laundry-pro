@@ -23,7 +23,7 @@ class TransactionsExport implements FromCollection, WithHeadings, WithMapping, S
 
     public function collection()
     {
-        return Transaction::with(['customer', 'user'])
+        return Transaction::with(['customer.user', 'user'])
             ->whereBetween('created_at', [$this->startDate . ' 00:00:00', $this->endDate . ' 23:59:59'])
             ->latest()
             ->get();
@@ -34,7 +34,7 @@ class TransactionsExport implements FromCollection, WithHeadings, WithMapping, S
         return [
             $transaction->invoice_code,
             $transaction->created_at->format('d/m/Y H:i'),
-            $transaction->customer->name,
+            $transaction->customer->user->name,
             $transaction->user->name,
             number_format($transaction->total_amount, 0, ',', '.'),
             number_format($transaction->discount_amount, 0, ',', '.'),

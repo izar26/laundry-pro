@@ -72,11 +72,13 @@ type Promotion = {
 };
 
 // Komponen Toggle Status
-const StatusToggle = ({ row }: { row: any }) => {
+const StatusToggle = ({ row, canManage }: { row: any, canManage: boolean }) => {
     const promo = row.original;
     const [isLoading, setIsLoading] = useState(false);
 
     const handleToggle = (checked: boolean) => {
+        if (!canManage) return;
+
         setIsLoading(true);
         router.put(route('promotions.update', promo.id), {
             ...promo, // Kirim data lama agar validasi required backend tetap lolos
@@ -101,7 +103,7 @@ const StatusToggle = ({ row }: { row: any }) => {
             <Switch 
                 checked={promo.is_active} 
                 onCheckedChange={handleToggle} 
-                disabled={isLoading}
+                disabled={isLoading || !canManage}
                 className="scale-75" // Sedikit diperkecil agar pas di tabel
             />
             <span className={cn("text-xs", promo.is_active ? "text-emerald-600 font-medium" : "text-muted-foreground")}>
@@ -292,7 +294,7 @@ function PromotionForm({
     );
 }
 
-function PromotionsIndex({ promotions, services }: { promotions: { data: Promotion[] }, services: Service[] }) {
+function PromotionsIndex({ promotions, services, canManagePromotions = false }: { promotions: { data: Promotion[] }, services: Service[], canManagePromotions?: boolean }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -328,9 +330,12 @@ function PromotionsIndex({ promotions, services }: { promotions: { data: Promoti
         {
             accessorKey: "is_active",
             header: "Status",
-            cell: ({ row }) => <StatusToggle row={row} />
+            cell: ({ row }) => <StatusToggle row={row} canManage={canManagePromotions} />
         },
-        {
+    ];
+
+    if (canManagePromotions) {
+        columns.push({
             id: "actions",
             cell: ({ row }) => (
                 <div className="flex justify-end">
@@ -343,8 +348,8 @@ function PromotionsIndex({ promotions, services }: { promotions: { data: Promoti
                     </DropdownMenu>
                 </div>
             ),
-        },
-    ];
+        });
+    }
 
     return (
         <>
@@ -354,19 +359,26 @@ function PromotionsIndex({ promotions, services }: { promotions: { data: Promoti
                     <h2 className="text-3xl font-bold tracking-tight">Promosi</h2>
                     <p className="text-muted-foreground">Kelola diskon layanan laundry.</p>
                 </div>
-                <Button onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }} size="lg"><Plus className="mr-2 h-4 w-4" /> Buat Promo</Button>
+                {canManagePromotions && (
+                    <Button onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }} size="lg"><Plus className="mr-2 h-4 w-4" /> Buat Promo</Button>
+                )}
             </div>
             <div className="mt-8"><DataTable columns={columns} data={promotions.data} pagination={promotions} searchKey="name" /></div>
-            <PromotionForm isOpen={isDialogOpen} setIsOpen={setIsDialogOpen} promotion={editingPromo} services={services} />
-            <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Hapus?</AlertDialogTitle></AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => destroy((route('promotions.destroy', deleteId || 0) as unknown) as string, { onSuccess: () => setDeleteId(null) })} className="bg-destructive">Hapus</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            
+            {canManagePromotions && (
+                <>
+                    <PromotionForm isOpen={isDialogOpen} setIsOpen={setIsDialogOpen} promotion={editingPromo} services={services} />
+                    <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Hapus?</AlertDialogTitle></AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => destroy((route('promotions.destroy', deleteId || 0) as unknown) as string, { onSuccess: () => setDeleteId(null) })} className="bg-destructive">Hapus</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </>
+            )}
         </>
     );
 }

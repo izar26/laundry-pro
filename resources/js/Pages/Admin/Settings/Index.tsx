@@ -11,6 +11,9 @@ import { Separator } from '@/Components/ui/separator';
 import { motion } from 'framer-motion';
 
 function SettingsIndex({ settings }: { settings: any }) {
+    const { auth } = usePage().props as any;
+    const isOwner = auth.user.roles?.includes('owner');
+
     const { data, setData, post, processing, errors } = useForm({
         app_name: settings.app_name || '',
         app_phone: settings.app_phone || '',
@@ -23,6 +26,7 @@ function SettingsIndex({ settings }: { settings: any }) {
     );
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isOwner) return; // Prevent change
         const file = e.target.files?.[0];
         if (file) {
             setData('app_logo', file);
@@ -32,6 +36,7 @@ function SettingsIndex({ settings }: { settings: any }) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (isOwner) return;
         post(route('settings.update'), {
             preserveScroll: true,
             onSuccess: () => {
@@ -70,18 +75,20 @@ function SettingsIndex({ settings }: { settings: any }) {
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <div className="relative">
-                                                <Button type="button" variant="outline" size="sm" className="relative z-10 pointer-events-none">
-                                                    <Upload className="h-4 w-4 mr-2" /> Pilih Gambar
-                                                </Button>
-                                                <Input 
-                                                    id="app_logo" 
-                                                    type="file" 
-                                                    accept="image/*"
-                                                    onChange={handleFileChange}
-                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
-                                                />
-                                            </div>
+                                            {!isOwner && (
+                                                <div className="relative">
+                                                    <Button type="button" variant="outline" size="sm" className="relative z-10 pointer-events-none">
+                                                        <Upload className="h-4 w-4 mr-2" /> Pilih Gambar
+                                                    </Button>
+                                                    <Input 
+                                                        id="app_logo" 
+                                                        type="file" 
+                                                        accept="image/*"
+                                                        onChange={handleFileChange}
+                                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
+                                                    />
+                                                </div>
+                                            )}
                                             <p className="text-[10px] text-muted-foreground mt-2">
                                                 Format JPG/PNG. Maks 2MB.
                                             </p>
@@ -99,6 +106,7 @@ function SettingsIndex({ settings }: { settings: any }) {
                                             onChange={(e) => setData('app_name', e.target.value)} 
                                             placeholder="Contoh: Berkah Laundry"
                                             className="font-medium text-lg"
+                                            readOnly={isOwner}
                                         />
                                         {errors.app_name && <p className="text-xs text-destructive">{errors.app_name}</p>}
                                     </div>
@@ -113,6 +121,7 @@ function SettingsIndex({ settings }: { settings: any }) {
                                                 onChange={(e) => setData('app_phone', e.target.value)} 
                                                 className="pl-9"
                                                 placeholder="0812..."
+                                                readOnly={isOwner}
                                             />
                                         </div>
                                         {errors.app_phone && <p className="text-xs text-destructive">{errors.app_phone}</p>}
@@ -128,18 +137,21 @@ function SettingsIndex({ settings }: { settings: any }) {
                                                 onChange={(e) => setData('app_address', e.target.value)} 
                                                 className="resize-none h-24 pl-9 pt-2"
                                                 placeholder="Jalan..."
+                                                readOnly={isOwner}
                                             />
                                         </div>
                                         {errors.app_address && <p className="text-xs text-destructive">{errors.app_address}</p>}
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end pt-4">
-                                    <Button type="submit" disabled={processing} size="lg" className="w-full sm:w-auto">
-                                        {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Simpan Perubahan
-                                    </Button>
-                                </div>
+                                {!isOwner && (
+                                    <div className="flex justify-end pt-4">
+                                        <Button type="submit" disabled={processing} size="lg" className="w-full sm:w-auto">
+                                            {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Simpan Perubahan
+                                        </Button>
+                                    </div>
+                                )}
                             </form>
                         </CardContent>
                     </Card>

@@ -18,9 +18,13 @@ class ServiceController extends Controller
 
         $services = $query->latest()->paginate(10)->withQueryString();
 
+        $user = auth()->user();
+        $canManageServices = $user->hasRole(['admin']); // Owner hanya read-only
+
         return Inertia::render('Admin/Services/Index', [
             'services' => $services,
             'filters' => $request->only(['search']),
+            'canManageServices' => $canManageServices,
         ]);
     }
 

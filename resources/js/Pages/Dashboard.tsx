@@ -11,7 +11,8 @@ import {
     ArrowDownRight,
     ShoppingBag,
     Clock,
-    User
+    User,
+    Star
 } from 'lucide-react';
 import { 
     Area, 
@@ -44,6 +45,7 @@ const StatCard = ({ title, value, icon: Icon, color, spotlight, desc }: any) => 
 const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
     
     const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+    const isPelanggan = stats.is_pelanggan;
 
     return (
         <>
@@ -53,21 +55,21 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
                 {/* Stats Cards Row */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard 
-                        title="Pendapatan Hari Ini" 
+                        title={isPelanggan ? "Pengeluaran Hari Ini" : "Pendapatan Hari Ini"}
                         icon={DollarSign} 
                         value={formatRupiah(stats.revenue_today)} 
                         color="text-emerald-500"
                         spotlight="rgba(16, 185, 129, 0.2)"
                     />
                     <StatCard 
-                        title="Pendapatan Bulan Ini" 
+                        title={isPelanggan ? "Pengeluaran Bulan Ini" : "Pendapatan Bulan Ini"}
                         icon={CreditCard} 
                         value={formatRupiah(stats.revenue_month)} 
                         color="text-blue-500"
                         spotlight="rgba(59, 130, 246, 0.2)"
                     />
                     <StatCard 
-                        title="Transaksi Aktif" 
+                        title={isPelanggan ? "Cucian Saya Aktif" : "Transaksi Aktif"}
                         icon={Activity} 
                         value={stats.trx_active} 
                         desc="Sedang diproses"
@@ -75,10 +77,10 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
                         spotlight="rgba(249, 115, 22, 0.2)"
                     />
                     <StatCard 
-                        title="Pelanggan Baru" 
-                        icon={Users} 
-                        value={`+${stats.customers_new_month}`} 
-                        desc="Bulan ini"
+                        title={isPelanggan ? "Poin Laundry" : "Pelanggan Baru"}
+                        icon={isPelanggan ? Star : Users} 
+                        value={isPelanggan ? stats.customers_total : `+${stats.customers_new_month}`} 
+                        desc={isPelanggan ? "Total Poin" : "Bulan ini"}
                         color="text-purple-500"
                         spotlight="rgba(168, 85, 247, 0.2)"
                     />
@@ -88,9 +90,9 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
                     {/* Chart Section */}
                     <Card className="col-span-4 border-none shadow-md">
                         <CardHeader>
-                            <CardTitle>Pendapatan 7 Hari Terakhir</CardTitle>
+                            <CardTitle>{isPelanggan ? "Riwayat Pengeluaran 7 Hari" : "Pendapatan 7 Hari Terakhir"}</CardTitle>
                             <CardDescription>
-                                Tren pendapatan harian dari transaksi yang lunas.
+                                {isPelanggan ? "Tren belanja laundry Anda." : "Tren pendapatan harian dari transaksi yang lunas."}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pl-0">
@@ -133,9 +135,9 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
                     {/* Recent Transactions */}
                     <Card className="col-span-3 border-none shadow-md">
                         <CardHeader>
-                            <CardTitle>Transaksi Terbaru</CardTitle>
+                            <CardTitle>{isPelanggan ? "Transaksi Terakhir Saya" : "Transaksi Terbaru"}</CardTitle>
                             <CardDescription>
-                                5 pesanan terakhir yang masuk sistem.
+                                {isPelanggan ? "5 pesanan terakhir Anda." : "5 pesanan terakhir yang masuk sistem."}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>

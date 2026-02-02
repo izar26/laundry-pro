@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Customer extends Model
+class Employee extends Model
 {
     use HasFactory;
 
@@ -14,8 +14,10 @@ class Customer extends Model
         'user_id',
         'phone',
         'address',
-        'points',
-        'member_level',
+        'nip',
+        'position',
+        'salary',
+        'join_date',
     ];
 
     public function user(): BelongsTo

@@ -22,18 +22,39 @@ interface AdminSidebarProps {
 export function AdminSidebar({ isCollapsed, toggleCollapse }: AdminSidebarProps) {
     const { app_settings, auth } = usePage().props as any;
     const user = auth.user;
+    const userRoles = user.roles || [];
+    const isAdminOrOwner = userRoles.includes('admin') || userRoles.includes('owner');
+    const isPegawai = userRoles.includes('pegawai');
+    const isPelanggan = userRoles.includes('pelanggan');
     const currentRoute = route().current();
 
-    const menuItems = [
+    const baseItems = [
         { name: 'Dashboard', url: route('dashboard'), icon: LayoutDashboard },
         { name: 'Transaksi', url: route('transactions.index'), icon: ShoppingBag },
-        { name: 'Pelanggan', url: route('customers.index'), icon: Users },
+    ];
+
+    // Menu yang hanya untuk manajemen (Admin, Owner, Pegawai)
+    const managementItems = [
+         { name: 'Pelanggan', url: route('customers.index'), icon: Users },
+    ];
+
+    const catalogItems = [
         { name: 'Layanan', url: route('services.index'), icon: Shirt },
         { name: 'Diskon', url: route('promotions.index'), icon: TrendingUp },
+    ];
+
+    const adminItems = [
         { name: 'Laporan', url: route('reports.index'), icon: FileText },
         { name: 'Pegawai', url: route('employees.index'), icon: Users },
         { name: 'Info Laundry', url: route('settings.index'), icon: Store },
-        { name: 'Profil Saya', url: route('profile.edit'), icon: Settings },
+    ];
+
+    const menuItems = [
+        ...baseItems,
+        // Tampilkan menu Pelanggan hanya untuk Admin/Owner/Pegawai
+        ...((isAdminOrOwner || isPegawai) ? managementItems : []),
+        ...catalogItems, // Layanan & Diskon tampil untuk semua (termasuk Pelanggan)
+        ...(isAdminOrOwner ? adminItems : []),
     ];
 
     const logoUrl = app_settings.app_logo ? `/storage/${app_settings.app_logo}` : null;
@@ -95,30 +116,32 @@ export function AdminSidebar({ isCollapsed, toggleCollapse }: AdminSidebarProps)
                     </div>
                 </div>
 
-                {/* Quick Action */}
-                <div className="px-3 mb-4">
-                    {isCollapsed ? (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button size="icon" className="w-full h-12 rounded-xl shadow-lg shadow-primary/25 bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all" asChild>
-                                    <Link href={route('transactions.create')}>
-                                        <Plus className="h-6 w-6" />
-                                    </Link>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="font-bold">Transaksi Baru</TooltipContent>
-                        </Tooltip>
-                    ) : (
-                        <Button className="w-full h-12 rounded-xl shadow-lg shadow-primary/25 bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all justify-start gap-3 font-bold text-md" asChild>
-                            <Link href={route('transactions.create')}>
-                                <div className="bg-white/20 p-1 rounded-md">
-                                    <Plus className="h-4 w-4" />
-                                </div>
-                                Transaksi Baru
-                            </Link>
-                        </Button>
-                    )}
-                </div>
+                {/* Quick Action - Hide for Owner */}
+                {!userRoles.includes('owner') && (
+                    <div className="px-3 mb-4">
+                        {isCollapsed ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button size="icon" className="w-full h-12 rounded-xl shadow-lg shadow-primary/25 bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all" asChild>
+                                        <Link href={route('transactions.create')}>
+                                            <Plus className="h-6 w-6" />
+                                        </Link>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="font-bold">Transaksi Baru</TooltipContent>
+                            </Tooltip>
+                        ) : (
+                            <Button className="w-full h-12 rounded-xl shadow-lg shadow-primary/25 bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all justify-start gap-3 font-bold text-md" asChild>
+                                <Link href={route('transactions.create')}>
+                                    <div className="bg-white/20 p-1 rounded-md">
+                                        <Plus className="h-4 w-4" />
+                                    </div>
+                                    Transaksi Baru
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
+                )}
 
                 {/* Menu Items */}
                 <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1 scrollbar-hide">
@@ -180,42 +203,6 @@ export function AdminSidebar({ isCollapsed, toggleCollapse }: AdminSidebarProps)
                             </Tooltip>
                         );
                     })}
-                </div>
-
-                {/* User Profile Footer */}
-                <div className="p-4 mt-auto">
-                    <div className={cn(
-                        "flex items-center gap-3 rounded-2xl p-2 transition-all border border-border/50 bg-gradient-to-b from-card to-muted/20 shadow-sm hover:shadow-md cursor-pointer group",
-                        isCollapsed ? "justify-center p-2 aspect-square" : "px-3 py-3"
-                    )}>
-                        <div className="relative">
-                            <Avatar className="h-10 w-10 border-2 border-background shadow-sm group-hover:scale-105 transition-transform">
-                                <AvatarImage src={`https://ui-avatars.com/api/?name=${user.name}&background=random`} />
-                                <AvatarFallback>U</AvatarFallback>
-                            </Avatar>
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-card rounded-full"></div>
-                        </div>
-                        
-                        <AnimatePresence>
-                            {!isCollapsed && (
-                                <motion.div 
-                                    initial={{ opacity: 0, width: 0 }}
-                                    animate={{ opacity: 1, width: 'auto' }}
-                                    exit={{ opacity: 0, width: 0 }}
-                                    className="flex-1 overflow-hidden"
-                                >
-                                    <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{user.name}</p>
-                                    <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wider">Online</p>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {!isCollapsed && (
-                            <Link href={route('logout')} method="post" as="button" className="text-muted-foreground hover:text-destructive transition-colors p-2 hover:bg-background rounded-lg shadow-sm opacity-0 group-hover:opacity-100">
-                                <LogOut className="h-4 w-4" />
-                            </Link>
-                        )}
-                    </div>
                 </div>
             </motion.aside>
         </TooltipProvider>

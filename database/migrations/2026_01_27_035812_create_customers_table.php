@@ -13,10 +13,11 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('phone')->unique(); // No HP unik untuk identifikasi
-            $table->string('email')->nullable();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Link ke User
+            $table->string('phone')->nullable();
             $table->text('address')->nullable();
+            $table->integer('points')->default(0); // Poin Laundry
+            $table->string('member_level')->default('Regular'); // Regular, Silver, Gold
             $table->timestamps();
         });
     }

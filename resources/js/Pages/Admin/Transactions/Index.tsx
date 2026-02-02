@@ -5,8 +5,9 @@ import { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/Components/ui/data-table/data-table';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import { Plus, Printer, RefreshCw, Pencil, MoreHorizontal, Eye, Trash, Loader2, CreditCard, Banknote, Calendar, TrendingUp, AlertCircle, Clock, CheckCircle2, LayoutList, Kanban as LayoutKanban } from 'lucide-react';
+import { Plus, Printer, RefreshCw, Pencil, MoreHorizontal, Eye, Trash, Loader2, CreditCard, Banknote, Calendar, TrendingUp, AlertCircle, Clock, CheckCircle2, LayoutList, Kanban as LayoutKanban, Search, XCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { Input } from '@/Components/ui/input';
 import {
   Select,
   SelectContent,
@@ -51,7 +52,14 @@ import KanbanBoard from './KanbanBoard';
 type Transaction = {
     id: number;
     invoice_code: string;
-    customer: { name: string };
+    customer: { 
+        user_id: number;
+        user: { 
+            name: string 
+        } 
+    };
+    user_id: number;
+    user: { id: number; name: string }; // Kasir
     total_amount: string;
     final_amount: string;
     payment_method: string;
@@ -74,11 +82,12 @@ declare global {
     }
 }
 
-const StatusCell = ({ row }: { row: any }) => {
+const StatusCell = ({ row, isReadOnly = false }: { row: any, isReadOnly?: boolean }) => {
     const transaction = row.original;
     const [loading, setLoading] = useState(false);
 
     const handleStatusChange = (newStatus: string) => {
+        if (isReadOnly) return;
         setLoading(true);
         router.patch(route('transactions.status', transaction.id), {
             status: newStatus
@@ -98,24 +107,45 @@ const StatusCell = ({ row }: { row: any }) => {
 
     const getStatusColor = (status: string) => {
         switch(status) {
+            case 'pending': return 'bg-yellow-500 hover:bg-yellow-600 text-white';
             case 'new': return 'bg-slate-500 hover:bg-slate-600 text-white';
             case 'process': return 'bg-blue-500 hover:bg-blue-600 text-white';
             case 'ready': return 'bg-orange-500 hover:bg-orange-600 text-white';
             case 'done': return 'bg-emerald-600 hover:bg-emerald-700 text-white';
+            case 'cancelled': return 'bg-red-500 hover:bg-red-600 text-white';
             default: return 'bg-gray-500';
         }
     };
 
+    const statusLabels: Record<string, string> = {
+        pending: 'Menunggu',
+        new: 'Baru Masuk',
+        process: 'Sedang Proses',
+        ready: 'Siap Ambil',
+        done: 'Selesai',
+        cancelled: 'Dibatalkan',
+    };
+
+    if (isReadOnly) {
+        return (
+            <Badge className={cn("w-[110px] h-7 text-[10px] flex justify-center border-none", getStatusColor(transaction.status))}>
+                {statusLabels[transaction.status] || transaction.status}
+            </Badge>
+        );
+    }
+
     return (
         <Select defaultValue={transaction.status} onValueChange={handleStatusChange} disabled={loading}>
-            <SelectTrigger className={`w-[100px] h-7 text-xs border-none font-medium ${getStatusColor(transaction.status)}`}>
+            <SelectTrigger className={`w-[110px] h-7 text-xs border-none font-medium ${getStatusColor(transaction.status)}`}>
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
+                <SelectItem value="pending">Menunggu</SelectItem>
                 <SelectItem value="new">Baru Masuk</SelectItem>
                 <SelectItem value="process">Sedang Proses</SelectItem>
                 <SelectItem value="ready">Siap Ambil</SelectItem>
                 <SelectItem value="done">Selesai</SelectItem>
+                <SelectItem value="cancelled">Dibatalkan</SelectItem>
             </SelectContent>
         </Select>
     );
@@ -123,10 +153,34 @@ const StatusCell = ({ row }: { row: any }) => {
 
 const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { transactions: { data: Transaction[] }, kanbanData: Transaction[], stats: Stats, filters: any }) => {
     
-    const { midtrans_client_key } = usePage().props as any;
+    const { midtrans_client_key, auth } = usePage().props as any;
+    const user = auth.user;
+    const isPelanggan = user.roles?.includes('pelanggan');
+    const isOwner = user.roles?.includes('owner');
+    // Read Only Status: Pelanggan DAN Owner
+    const isReadOnlyStatus = isPelanggan || isOwner;
+    
+    const canViewCreator = user.roles?.includes('admin') || user.roles?.includes('owner') || user.roles?.includes('pegawai');
+    const canCreateTransaction = !isOwner; // Owner read-only, sisanya boleh (Admin, Pegawai, Pelanggan)
+
     const [isChecking, setIsChecking] = useState<number | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const { delete: destroy, processing: isDeleting } = useForm({});
+
+    const [searchValue, setSearchValue] = useState(filters.search || "");
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchValue !== (filters.search || "")) {
+                router.get(
+                    route('transactions.index'), 
+                    { ...filters, search: searchValue, page: 1 },
+                    { preserveState: true, replace: true }
+                )
+            }
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [searchValue]);
 
     const currentView = filters.view || 'list';
     const currentStatus = filters.status || 'all';
@@ -174,7 +228,6 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
             destroy(route('transactions.destroy', deleteId), {
                 onSuccess: () => {
                     setDeleteId(null);
-                    // toast dihapus
                 },
                 onError: () => toast.error('Gagal menghapus transaksi.')
             });
@@ -193,18 +246,6 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
         </SpotlightCard>
     );
 
-    const FilterTab = ({ label, value, active }: any) => (
-        <Link 
-            href={route('transactions.index', { status: value, view: 'list' })} 
-            className={cn(
-                "px-4 py-2 text-sm font-medium rounded-full transition-colors",
-                active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-        >
-            {label}
-        </Link>
-    );
-
     const columns: ColumnDef<Transaction>[] = [
         {
             accessorKey: "invoice_code",
@@ -220,10 +261,28 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
             )
         },
         {
-            accessorKey: "customer.name",
+            accessorKey: "customer.user.name",
             header: "Pelanggan",
-            cell: ({ row }) => <div className="font-medium text-sm">{row.original.customer.name}</div>
+            cell: ({ row }) => <div className="font-medium text-sm">{row.original.customer.user?.name || 'Umum'}</div>
         },
+        // Kolom Kasir (Hanya untuk Admin/Owner/Pegawai)
+        ...(canViewCreator ? [{
+            accessorKey: "user.name",
+            header: "Dibuat Oleh",
+            cell: ({ row }: { row: any }) => {
+                const creatorId = row.original.user?.id;
+                const customerUserId = row.original.customer?.user_id;
+                const isCreatedByCustomer = creatorId === customerUserId;
+
+                return (
+                    <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm text-muted-foreground">
+                            {isCreatedByCustomer ? 'Pelanggan' : row.original.user?.name}
+                        </div>
+                    </div>
+                );
+            }
+        }] : []),
         {
             accessorKey: "final_amount",
             header: "Total",
@@ -255,7 +314,7 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
         {
             accessorKey: "status",
             header: "Status Cucian",
-            cell: ({ row }) => <StatusCell row={row} />
+            cell: ({ row }) => <StatusCell row={row} isReadOnly={isReadOnlyStatus} />
         },
         {
             id: "actions",
@@ -304,9 +363,22 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
                                         <Eye className="mr-2 h-4 w-4" /> Detail
                                     </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setDeleteId(transaction.id)} className="text-destructive">
-                                    <Trash className="mr-2 h-4 w-4" /> Hapus
-                                </DropdownMenuItem>
+                                
+                                {isPelanggan && transaction.status === 'pending' && (
+                                    <DropdownMenuItem onClick={() => {
+                                        if (confirm('Yakin ingin membatalkan pesanan ini?')) {
+                                            router.patch(route('transactions.cancel', transaction.id));
+                                        }
+                                    }} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                        <XCircle className="mr-2 h-4 w-4" /> Batalkan Pesanan
+                                    </DropdownMenuItem>
+                                )}
+
+                                {!isPelanggan && !isOwner && (
+                                    <DropdownMenuItem onClick={() => setDeleteId(transaction.id)} className="text-destructive">
+                                        <Trash className="mr-2 h-4 w-4" /> Hapus
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -351,43 +423,71 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
                 />
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-                {/* View Toggle */}
-                <div className="flex bg-muted rounded-lg p-1">
-                    <Link
-                        href={route('transactions.index', { view: 'list' })}
-                        className={cn("px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2", currentView === 'list' ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <LayoutList className="h-4 w-4" /> List
-                    </Link>
-                    <Link
-                        href={route('transactions.index', { view: 'board' })}
-                        className={cn("px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2", currentView === 'board' ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <LayoutKanban className="h-4 w-4" /> Board
-                    </Link>
+            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 mb-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full xl:w-auto">
+                    {/* View Toggle */}
+                    <div className="flex bg-muted rounded-lg p-1 shrink-0">
+                        <Link
+                            href={route('transactions.index', { ...filters, view: 'list' })}
+                            className={cn("px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2", currentView === 'list' ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <LayoutList className="h-4 w-4" /> List
+                        </Link>
+                        <Link
+                            href={route('transactions.index', { ...filters, view: 'board' })}
+                            className={cn("px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2", currentView === 'board' ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <LayoutKanban className="h-4 w-4" /> Board
+                        </Link>
+                    </div>
+
+                    {/* Search & Filter Group */}
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <div className="relative w-full md:w-[250px]">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Cari invoice/nama..."
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                                className="pl-9 h-9"
+                            />
+                        </div>
+
+                        {currentView === 'list' && (
+                            <Select 
+                                value={currentStatus} 
+                                onValueChange={(val) => router.get(route('transactions.index', { ...filters, status: val, page: 1 }))}
+                            >
+                                <SelectTrigger className="w-[140px] h-9">
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Semua</SelectItem>
+                                    <SelectItem value="unpaid">Belum Lunas</SelectItem>
+                                    <SelectItem value="pending">Menunggu</SelectItem>
+                                    <SelectItem value="new">Baru Masuk</SelectItem>
+                                    <SelectItem value="process">Sedang Proses</SelectItem>
+                                    <SelectItem value="ready">Siap Ambil</SelectItem>
+                                    <SelectItem value="done">Selesai</SelectItem>
+                                    <SelectItem value="cancelled">Batal</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
                 </div>
 
-                {/* Filter Tabs (Hanya Muncul di List View) */}
-                {currentView === 'list' && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
-                        <FilterTab label="Semua" value="all" active={currentStatus === 'all'} />
-                        <FilterTab label="Belum Lunas" value="unpaid" active={currentStatus === 'unpaid'} />
-                        <FilterTab label="Sedang Proses" value="process" active={currentStatus === 'process'} />
-                        <FilterTab label="Selesai" value="done" active={currentStatus === 'done'} />
-                    </div>
+                {canCreateTransaction && (
+                    <Button asChild size="lg" className="shadow-lg shadow-primary/20 w-full sm:w-auto">
+                        <Link href={route('transactions.create')}>
+                            <Plus className="mr-2 h-4 w-4" /> Transaksi Baru (POS)
+                        </Link>
+                    </Button>
                 )}
-
-                <Button asChild size="lg" className="shadow-lg shadow-primary/20">
-                    <Link href={route('transactions.create')}>
-                        <Plus className="mr-2 h-4 w-4" /> Transaksi Baru (POS)
-                    </Link>
-                </Button>
             </div>
 
             {currentView === 'list' ? (
-                <div className="bg-card rounded-xl border shadow-sm">
-                    <DataTable columns={columns} data={transactions.data} pagination={transactions} searchKey="invoice_code" />
+                <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                    <DataTable columns={columns} data={transactions.data} pagination={transactions} />
                 </div>
             ) : (
                 <div className="h-[600px]">

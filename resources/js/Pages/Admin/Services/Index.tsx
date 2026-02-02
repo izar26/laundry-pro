@@ -186,7 +186,7 @@ function ServiceForm({
     );
 }
 
-function ServicesIndex({ services }: { services: { data: Service[] } }) {
+function ServicesIndex({ services, canManageServices = false }: { services: { data: Service[] }, canManageServices?: boolean }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingService, setEditingService] = useState<Service | null>(null);
     
@@ -259,7 +259,10 @@ function ServicesIndex({ services }: { services: { data: Service[] } }) {
                 </div>
             )
         },
-        {
+    ];
+
+    if (canManageServices) {
+        columns.push({
             id: "actions",
             cell: ({ row }) => {
                 const service = row.original;
@@ -288,8 +291,8 @@ function ServicesIndex({ services }: { services: { data: Service[] } }) {
                     </div>
                 );
             },
-        },
-    ];
+        });
+    }
 
     return (
         <>
@@ -302,42 +305,48 @@ function ServicesIndex({ services }: { services: { data: Service[] } }) {
                         Atur jenis layanan laundry dan harga satuan.
                     </p>
                 </div>
-                <Button onClick={openCreateDialog} size="lg">
-                    <Plus className="mr-2 h-4 w-4" /> Tambah Layanan
-                </Button>
+                {canManageServices && (
+                    <Button onClick={openCreateDialog} size="lg">
+                        <Plus className="mr-2 h-4 w-4" /> Tambah Layanan
+                    </Button>
+                )}
             </div>
 
             <div className="mt-8">
                 <DataTable columns={columns} data={services.data} pagination={services} searchKey="name" />
             </div>
 
-            <ServiceForm 
-                isOpen={isDialogOpen} 
-                setIsOpen={setIsDialogOpen} 
-                service={editingService} 
-            />
+            {canManageServices && (
+                <>
+                    <ServiceForm 
+                        isOpen={isDialogOpen} 
+                        setIsOpen={setIsDialogOpen} 
+                        service={editingService} 
+                    />
 
-            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Hapus Layanan?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Layanan ini akan dihapus permanen. Transaksi lama yang menggunakan layanan ini mungkin akan kehilangan referensi nama layanan.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={(e) => { e.preventDefault(); handleDelete(); }}
-                            disabled={isDeleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash className="mr-2 h-4 w-4" />}
-                            {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus Layanan?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Layanan ini akan dihapus permanen. Transaksi lama yang menggunakan layanan ini mungkin akan kehilangan referensi nama layanan.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
+                                <AlertDialogAction 
+                                    onClick={(e) => { e.preventDefault(); handleDelete(); }}
+                                    disabled={isDeleting}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash className="mr-2 h-4 w-4" />}
+                                    {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </>
+            )}
         </>
     );
 }

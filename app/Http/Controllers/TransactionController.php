@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
-use App\Models\Customer;
+use App\Models\User;
 use App\Models\Service;
 use App\Models\Promotion;
 use App\Models\Setting; // Import Setting yang benar
@@ -58,12 +58,22 @@ class TransactionController extends Controller
 
         // 2. Jika Mode Kanban (Board), ambil data active only tapi lengkap
         if ($request->get('view') === 'board') {
-            $kanbanData = Transaction::with('customer:id,name') // Eager load minimal
-                ->select('id', 'invoice_code', 'customer_id', 'total_amount', 'final_amount', 'payment_status', 'status', 'created_at')
-                ->whereIn('status', ['new', 'process', 'ready', 'done']) // Ambil semua status
+            $query = Transaction::with('customer.user') // Eager load minimal
+                ->select('id', 'invoice_code', 'customer_id', 'user_id', 'total_amount', 'final_amount', 'payment_status', 'status', 'created_at')
+                ->whereIn('status', ['pending', 'new', 'process', 'ready', 'done', 'cancelled']) // Ambil semua status
                 ->whereDate('created_at', '>=', now()->subDays(30)) // Batasi 30 hari terakhir agar tidak berat
-                ->orderBy('created_at', 'desc')
-                ->get();
+                ->orderBy('created_at', 'desc');
+
+            // Filter Hak Akses untuk Kanban
+            $user = $request->user();
+            if ($user->hasRole('pelanggan')) {
+                $query->whereHas('customer', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            }
+            // Pegawai lihat semua (hapus filter user_id)
+
+            $kanbanData = $query->get();
             
             return Inertia::render('Admin/Transactions/Index', [
                 'transactions' => ['data' => []], // Dummy pagination object
@@ -73,7 +83,18 @@ class TransactionController extends Controller
             ]);
         }
 
-        $query = Transaction::with(['customer', 'user']);
+        $query = Transaction::with(['customer.user', 'user']);
+
+        // Filter Hak Akses
+        $user = $request->user();
+        
+        // Pelanggan hanya bisa melihat transaksinya sendiri
+        if ($user->hasRole('pelanggan')) {
+            $query->whereHas('customer', function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
+        }
+        // Pegawai, Admin, Owner bisa melihat SEMUA transaksi (tidak ada filter user_id lagi)
 
         if ($request->has('status') && $request->status !== 'all') {
             if ($request->status === 'unpaid') {
@@ -85,7 +106,7 @@ class TransactionController extends Controller
 
         if ($request->has('search')) {
             $query->where('invoice_code', 'like', "%{$request->search}%")
-                  ->orWhereHas('customer', function($q) use ($request) {
+                  ->orWhereHas('customer.user', function($q) use ($request) {
                       $q->where('name', 'like', "%{$request->search}%");
                   });
         }
@@ -102,8 +123,18 @@ class TransactionController extends Controller
 
     public function create()
     {
+        // Ambil data Customer lengkap dengan relasi user (untuk nama)
+        $customers = \App\Models\Customer::with('user')->get()->map(function($customer) {
+            return [
+                'id' => $customer->id, // ID Customer (bukan ID User)
+                'name' => $customer->user->name,
+                'phone' => $customer->phone ?? '-',
+                'user_id' => $customer->user_id // Tambahan untuk referensi
+            ];
+        });
+
         return Inertia::render('Admin/Transactions/Create', [
-            'customers' => Customer::all(),
+            'customers' => $customers,
             'services' => Service::all(),
             'promotions' => Promotion::where('is_active', true)
                                    ->where(function($q) {
@@ -115,6 +146,14 @@ class TransactionController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+        $isCustomer = $user->hasRole('pelanggan');
+
+        // Jika user adalah pelanggan, customer_id otomatis dirinya sendiri
+        if ($isCustomer) {
+            $request->merge(['customer_id' => $user->customer->id ?? null]);
+        }
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'items' => 'required|array|min:1',
@@ -127,6 +166,11 @@ class TransactionController extends Controller
         DB::beginTransaction();
         try {
             $totalAmount = 0;
+            // ... (rest of logic) ...
+            
+            // ... inside transaction creation ...
+            // $initialStatus = $isCustomer ? 'pending' : 'new';
+
             $items = [];
             $cartCollection = collect();
 
@@ -194,6 +238,10 @@ class TransactionController extends Controller
             $finalAmount = $totalAmount - $discountAmount;
 
             $initialPaymentStatus = $validated['payment_method'] === 'cash' ? 'paid' : 'unpaid';
+            
+            // Jika pelanggan yang input, status awal 'pending' (menunggu konfirmasi admin/pegawai)
+            // Jika pegawai/admin, status awal 'new' (langsung masuk antrian)
+            $initialStatus = $isCustomer ? 'pending' : 'new';
 
             $transaction = Transaction::create([
                 'invoice_code' => 'TRX-' . date('Ymd') . '-' . strtoupper(Str::random(4)),
@@ -204,7 +252,7 @@ class TransactionController extends Controller
                 'final_amount' => $finalAmount,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => $initialPaymentStatus,
-                'status' => 'new',
+                'status' => $initialStatus,
             ]);
 
             foreach ($items as $detail) {
@@ -226,7 +274,7 @@ class TransactionController extends Controller
                 Config::$isSanitized = true;
                 Config::$is3ds = true;
 
-                $customer = Customer::find($validated['customer_id']);
+                $customer = Customer::with('user')->find($validated['customer_id']);
 
                 $params = [
                     'transaction_details' => [
@@ -234,8 +282,8 @@ class TransactionController extends Controller
                         'gross_amount' => (int) $finalAmount,
                     ],
                     'customer_details' => [
-                        'first_name' => $customer->name,
-                        'email' => $customer->email,
+                        'first_name' => $customer->user->name,
+                        'email' => $customer->user->email,
                         'phone' => $customer->phone,
                     ],
                     'callbacks' => [
@@ -318,15 +366,31 @@ class TransactionController extends Controller
     public function updateStatus(Request $request, Transaction $transaction)
     {
         $validated = $request->validate([
-            'status' => 'required|in:new,process,ready,done',
+            'status' => 'required|in:pending,new,process,ready,done,cancelled',
         ]);
         $transaction->update(['status' => $validated['status']]);
         return redirect()->back()->with('message', 'Status laundry diperbarui.');
     }
 
+    public function cancel(Transaction $transaction)
+    {
+        if ($transaction->status !== 'pending') {
+            return redirect()->back()->withErrors(['message' => 'Hanya transaksi status menunggu yang bisa dibatalkan.']);
+        }
+        
+        // Pastikan pelanggan hanya bisa membatalkan miliknya sendiri (extra security, walau policy handle)
+        $user = auth()->user();
+        if ($user->hasRole('pelanggan') && $transaction->customer->user_id !== $user->id) {
+            abort(403);
+        }
+
+        $transaction->update(['status' => 'cancelled']);
+        return redirect()->back()->with('message', 'Transaksi berhasil dibatalkan.');
+    }
+
     public function print(Transaction $transaction)
     {
-        $transaction->load(['customer', 'user', 'details']);
+        $transaction->load(['customer.user', 'user', 'details']);
         $settings = Setting::all()->pluck('value', 'key');
         return view('print.receipt', compact('transaction', 'settings'));
     }

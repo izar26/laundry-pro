@@ -16,10 +16,9 @@ import {
     CartesianGrid, 
     Tooltip, 
     ResponsiveContainer,
-    PieChart, 
-    Pie, 
-    Cell,
-    Legend
+    BarChart,
+    Bar,
+    Cell
 } from 'recharts';
 import { format, subDays, startOfMonth, subMonths, startOfYear } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -94,9 +93,9 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
             cell: ({ row }) => <div className="text-xs text-muted-foreground">{format(new Date(row.getValue("created_at")), "dd MMM yyyy HH:mm", { locale: idLocale })}</div>
         },
         {
-            accessorKey: "customer.name",
+            accessorKey: "customer.user.name",
             header: "Pelanggan",
-            cell: ({ row }) => <div className="font-medium">{row.original.customer.name}</div>
+            cell: ({ row }) => <div className="font-medium">{row.original.customer.user?.name || 'Umum'}</div>
         },
         {
             accessorKey: "final_amount",
@@ -284,54 +283,42 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
 
                 <Card className="md:col-span-3 border-none shadow-md">
                     <CardHeader>
-                        <CardTitle>Top 5 Layanan</CardTitle>
+                        <CardTitle>Top 5 Layanan Terlaris</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[300px] relative">
+                        <div className="h-[300px] w-full">
                             {topServices.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={topServices}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={5}
-                                            dataKey="total_qty"
-                                            nameKey="service_name"
-                                            stroke="none"
-                                        >
+                                    <BarChart
+                                        layout="vertical"
+                                        data={topServices}
+                                        margin={{ top: 0, right: 30, left: 40, bottom: 5 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                                        <XAxis type="number" hide />
+                                        <YAxis 
+                                            dataKey="service_name" 
+                                            type="category" 
+                                            width={100}
+                                            tick={{ fontSize: 11 }}
+                                            interval={0}
+                                        />
+                                        <Tooltip
+                                            cursor={{ fill: 'transparent' }}
+                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            formatter={((value: number) => [value + 'x', 'Terjual']) as any}
+                                        />
+                                        <Bar dataKey="total_qty" radius={[0, 4, 4, 0]} barSize={32}>
                                             {topServices.map((entry: any, index: number) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
-                                        </Pie>
-                                        <Tooltip 
-                                            formatter={((value: number) => [value + 'x', 'Terjual']) as any}
-                                            contentStyle={{ borderRadius: '8px' }}
-                                        />
-                                        <Legend 
-                                            layout="horizontal" 
-                                            verticalAlign="bottom" 
-                                            align="center"
-                                            iconType="circle"
-                                            wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }} 
-                                        />
-                                    </PieChart>
+                                        </Bar>
+                                    </BarChart>
                                 </ResponsiveContainer>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
                                     <ShoppingBag className="h-10 w-10 mb-2" />
                                     <p>Belum ada data layanan</p>
-                                </div>
-                            )}
-                            
-                            {topServices.length > 0 && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
-                                    <div className="text-center">
-                                        <span className="text-2xl font-bold block">{topServices.reduce((acc: number, curr: any) => acc + parseFloat(curr.total_qty), 0)}</span>
-                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Item</span>
-                                    </div>
                                 </div>
                             )}
                         </div>

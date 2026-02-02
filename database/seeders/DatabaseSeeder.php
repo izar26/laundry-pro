@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
             ServiceSeeder::class,
             PromotionSeeder::class,
             CustomerSeeder::class,
+            SettingSeeder::class, // Tambahkan Setting jika belum
+            TransactionSeeder::class, // Seeder Transaksi di akhir
         ]);
     }
 }

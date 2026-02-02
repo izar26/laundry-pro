@@ -21,10 +21,14 @@ class PromotionController extends Controller
 
         $promotions = $query->latest()->paginate(10)->withQueryString();
 
+        $user = auth()->user();
+        $canManagePromotions = $user->hasRole(['admin']); // Owner hanya read-only
+
         return Inertia::render('Admin/Promotions/Index', [
             'promotions' => $promotions,
             'services' => Service::all(), // Kirim daftar layanan untuk pilihan di form
             'filters' => $request->only(['search']),
+            'canManagePromotions' => $canManagePromotions,
         ]);
     }
 

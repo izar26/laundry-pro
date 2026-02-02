@@ -26,7 +26,7 @@ class ReportController extends Controller
             'transactions_count' => Transaction::whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
                         ->where('payment_status', 'paid')
                         ->count(),
-            'customers_new' => \App\Models\Customer::whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
+            'customers_new' => \App\Models\User::role('pelanggan')->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
                         ->count(),
         ];
 
@@ -52,7 +52,7 @@ class ReportController extends Controller
             ->get();
 
         // 4. Tabel Transaksi
-        $transactions = Transaction::with(['customer'])
+        $transactions = Transaction::with(['customer.user'])
             ->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
             ->latest()
             ->paginate(20)

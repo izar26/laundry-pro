@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,15 +30,41 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $validated = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // 1. Handle Avatar Upload
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            $user->avatar = $request->file('avatar')->store('avatars', 'public');
         }
 
-        $request->user()->save();
+        // 2. Update User Data (Name, Email)
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
 
-        return Redirect::route('profile.edit');
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        // 3. Update Extended Data (Phone, Address) -> Employee / Customer
+        $extendedData = [
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+        ];
+
+        // Admin & Owner dianggap "Internal/Employee" untuk penyimpanan data profil
+        if ($user->hasRole(['pegawai', 'admin', 'owner'])) {
+            $user->employee()->updateOrCreate(['user_id' => $user->id], $extendedData);
+        } elseif ($user->hasRole('pelanggan')) {
+            $user->customer()->updateOrCreate(['user_id' => $user->id], $extendedData);
+        }
+
+        return Redirect::route('profile.edit')->with('message', 'Profil berhasil diperbarui.');
     }
 
     /**

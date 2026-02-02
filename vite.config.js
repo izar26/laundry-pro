@@ -10,11 +10,4 @@ export default defineConfig({
         }),
         react(),
     ],
-    server: {
-        host: '0.0.0.0', // Listen on all IPs
-        hmr: {
-            host: '192.168.1.109', // Ganti dengan IP lokal laptop Anda agar HMR jalan di HP
-        },
-        cors: true, // Izinkan CORS
-    },
 });

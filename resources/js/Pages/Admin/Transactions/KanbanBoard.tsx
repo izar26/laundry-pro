@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
 import { format } from 'date-fns';
@@ -12,7 +12,9 @@ import { User, Clock, CheckCircle2 } from 'lucide-react';
 type Transaction = {
     id: number;
     invoice_code: string;
-    customer: { name: string };
+    customer: { 
+        user: { name: string } 
+    };
     total_amount: string;
     final_amount: string;
     payment_method: string;
@@ -29,20 +31,27 @@ type Column = {
 };
 
 export default function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
+    const { auth } = usePage().props as any;
+    const isDragDisabled = auth.user.roles?.includes('pelanggan') || auth.user.roles?.includes('owner');
+
     const [columns, setColumns] = useState<Record<string, Column>>({
+        pending: { id: 'pending', title: 'Menunggu', items: [], color: 'bg-yellow-500' },
         new: { id: 'new', title: 'Baru Masuk', items: [], color: 'bg-slate-500' },
         process: { id: 'process', title: 'Sedang Proses', items: [], color: 'bg-blue-500' },
         ready: { id: 'ready', title: 'Siap Ambil', items: [], color: 'bg-orange-500' },
         done: { id: 'done', title: 'Selesai', items: [], color: 'bg-emerald-600' },
+        cancelled: { id: 'cancelled', title: 'Dibatalkan', items: [], color: 'bg-red-500' },
     });
 
     // Inisialisasi data kolom
     useEffect(() => {
         const newCols = {
+            pending: { id: 'pending', title: 'Menunggu', items: [], color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200' },
             new: { id: 'new', title: 'Baru Masuk', items: [], color: 'bg-slate-100 dark:bg-slate-900 border-slate-200' },
             process: { id: 'process', title: 'Sedang Proses', items: [], color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200' },
             ready: { id: 'ready', title: 'Siap Ambil', items: [], color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200' },
             done: { id: 'done', title: 'Selesai', items: [], color: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200' },
+            cancelled: { id: 'cancelled', title: 'Dibatalkan', items: [], color: 'bg-red-50 dark:bg-red-900/20 border-red-200' },
         };
 
         transactions.forEach(trx => {
@@ -110,7 +119,7 @@ export default function KanbanBoard({ transactions }: { transactions: Transactio
                                         )}
                                     >
                                         {column.items.map((item, index) => (
-                                            <Draggable key={item.id} draggableId={item.id.toString()} index={index}>
+                                            <Draggable key={item.id} draggableId={item.id.toString()} index={index} isDragDisabled={isDragDisabled}>
                                                 {(provided, snapshot) => (
                                                     <Card
                                                         ref={provided.innerRef}
@@ -130,7 +139,7 @@ export default function KanbanBoard({ transactions }: { transactions: Transactio
                                                             </div>
                                                             <div className="flex items-center gap-2 text-sm font-medium">
                                                                 <User className="h-3 w-3 text-muted-foreground" />
-                                                                {item.customer.name}
+                                                                {item.customer.user?.name || 'Umum'}
                                                             </div>
                                                             <div className="flex justify-between items-end pt-2 border-t">
                                                                 <div className="text-[10px] text-muted-foreground flex items-center gap-1">

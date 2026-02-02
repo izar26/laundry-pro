@@ -24,6 +24,7 @@ import {
 } from "@/Components/ui/alert-dialog";
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
+import { Textarea } from '@/Components/ui/textarea';
 import { Plus, Pencil, Trash, MoreHorizontal, Loader2, User as UserIcon } from 'lucide-react';
 import {
     DropdownMenu,
@@ -34,13 +35,26 @@ import {
 } from '@/Components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
+import { Badge } from '@/Components/ui/badge';
 
 // Tipe Data User/Employee
 type Employee = {
     id: number;
-    name: string;
-    email: string;
+    user_id: number;
+    phone?: string;
+    address?: string;
+    nip?: string;
+    position?: string;
+    salary?: number;
+    join_date?: string;
     created_at: string;
+    user: {
+        id: number;
+        name: string;
+        email: string;
+        avatar?: string;
+        roles: { name: string }[];
+    }
 };
 
 function EmployeeForm({ 
@@ -56,14 +70,18 @@ function EmployeeForm({
         name: '',
         email: '',
         password: '',
+        phone: '',
+        address: '',
     });
 
     useEffect(() => {
         if (employee) {
             setData({
-                name: employee.name,
-                email: employee.email,
-                password: '', // Kosongkan saat edit
+                name: employee.user.name,
+                email: employee.user.email,
+                password: '',
+                phone: employee.phone || '',
+                address: employee.address || '',
             });
         } else {
             reset();
@@ -127,6 +145,26 @@ function EmployeeForm({
                     </div>
 
                     <div className="grid gap-2">
+                        <Label htmlFor="phone">Nomor HP</Label>
+                        <Input
+                            id="phone"
+                            placeholder="0812xxxx"
+                            value={data.phone}
+                            onChange={(e) => setData('phone', e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="address">Alamat</Label>
+                        <Textarea
+                            id="address"
+                            placeholder="Jl. Alamat Pegawai..."
+                            value={data.address}
+                            onChange={(e) => setData('address', e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid gap-2">
                         <Label htmlFor="password">
                             {employee ? 'Password Baru (Opsional)' : 'Password'} {employee ? '' : <span className="text-red-500">*</span>}
                         </Label>
@@ -158,6 +196,10 @@ function EmployeeForm({
 function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
     const { auth } = usePage().props as any;
     const currentUser = auth.user;
+    // Cek apakah user adalah Owner (Read Only)
+    const isOwner = currentUser.roles?.includes('owner');
+    // Admin boleh manage, Owner tidak boleh
+    const canManageEmployees = !isOwner;
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -192,32 +234,43 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
 
     const columns: ColumnDef<Employee>[] = [
         {
-            accessorKey: "name",
+            accessorKey: "user.name",
             header: "Nama Pegawai",
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={`https://ui-avatars.com/api/?name=${row.original.name}&background=random`} />
+                        <AvatarImage src={row.original.user.avatar ? `/storage/${row.original.user.avatar}` : `https://ui-avatars.com/api/?name=${row.original.user.name}&background=random`} />
                         <AvatarFallback><UserIcon className="h-4 w-4" /></AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                        <span className="font-medium">{row.getValue("name")}</span>
-                        {row.original.id === currentUser.id && (
-                            <span className="text-[10px] bg-primary/10 text-primary px-1 rounded w-fit">It's You</span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium">{row.original.user.name}</span>
+                            {row.original.position === 'Owner' && (
+                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-purple-600 hover:bg-purple-700">Owner</Badge>
+                            )}
+                            {row.original.position === 'Administrator' && (
+                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-blue-600 hover:bg-blue-700">Admin</Badge>
+                            )}
+                        </div>
+                        {row.original.user.id === currentUser.id && (
+                            <span className="text-[10px] text-muted-foreground">It's You</span>
                         )}
                     </div>
                 </div>
             )
         },
         {
-            accessorKey: "email",
+            accessorKey: "user.email",
             header: "Email",
         },
-        {
+    ];
+
+    if (canManageEmployees) {
+        columns.push({
             id: "actions",
             cell: ({ row }) => {
                 const employee = row.original;
-                const isMe = employee.id === currentUser.id;
+                const isMe = employee.user.id === currentUser.id;
 
                 return (
                     <div className="flex justify-end">
@@ -243,8 +296,8 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
                     </div>
                 );
             },
-        },
-    ];
+        });
+    }
 
     return (
         <>
@@ -254,30 +307,37 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
                     <h2 className="text-3xl font-bold tracking-tight">Data Pegawai</h2>
                     <p className="text-muted-foreground">Kelola akun staf yang memiliki akses ke sistem.</p>
                 </div>
-                <Button onClick={openCreateDialog} size="lg">
-                    <Plus className="mr-2 h-4 w-4" /> Tambah Pegawai
-                </Button>
+                {canManageEmployees && (
+                    <Button onClick={openCreateDialog} size="lg">
+                        <Plus className="mr-2 h-4 w-4" /> Tambah Pegawai
+                    </Button>
+                )}
             </div>
             <div className="mt-8">
                 <DataTable columns={columns} data={employees.data} pagination={employees} searchKey="name" />
             </div>
-            <EmployeeForm isOpen={isDialogOpen} setIsOpen={setIsDialogOpen} employee={editingEmployee} />
-            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Hapus Akun Pegawai?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Akses login pegawai ini akan dicabut permanen. Data transaksi yang pernah dibuat oleh pegawai ini tetap aman.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                            {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            
+            {canManageEmployees && (
+                <>
+                    <EmployeeForm isOpen={isDialogOpen} setIsOpen={setIsDialogOpen} employee={editingEmployee} />
+                    <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus Akun Pegawai?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Akses login pegawai ini akan dicabut permanen. Data transaksi yang pernah dibuat oleh pegawai ini tetap aman.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
+                                <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                                    {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </>
+            )}
         </>
     );
 }

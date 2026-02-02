@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('invoice_code')->unique(); // TRX-20240120-0001
             
             // Relasi
-            $table->foreignId('customer_id')->constrained()->onDelete('cascade');
+            $table->foreignId('customer_id')->constrained('users')->onDelete('cascade'); // Pelanggan (User)
             $table->foreignId('user_id')->constrained(); // Siapa yang input (Pegawai/Admin)
             
             // Keuangan

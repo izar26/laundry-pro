@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const themes = [
-  { name: "Zinc", class: "theme-zinc", color: "bg-zinc-950" },
+  { name: "Zinc", class: "theme-zinc", color: "bg-zinc-950 dark:bg-zinc-100" },
   { name: "Blue", class: "theme-blue", color: "bg-blue-600" },
   { name: "Violet", class: "theme-violet", color: "bg-violet-600" },
   { name: "Green", class: "theme-green", color: "bg-green-600" },

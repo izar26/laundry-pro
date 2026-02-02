@@ -34,15 +34,24 @@ import {
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
+import { User as UserIcon } from 'lucide-react';
 
 // Tipe Data Customer
 type Customer = {
     id: number;
-    name: string;
+    user_id: number;
     phone: string;
-    email: string | null;
     address: string | null;
+    points: number;
+    member_level: string;
     created_at: string;
+    user: {
+        id: number;
+        name: string;
+        email: string;
+        avatar?: string;
+    }
 };
 
 // Komponen Form untuk Create/Edit
@@ -65,9 +74,9 @@ function CustomerForm({
     useEffect(() => {
         if (customer) {
             setData({
-                name: customer.name,
+                name: customer.user.name,
                 phone: customer.phone,
-                email: customer.email || '',
+                email: customer.user.email || '',
                 address: customer.address || '',
             });
         } else {
@@ -171,6 +180,10 @@ function CustomerForm({
 }
 
 function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
+    const { auth } = usePage().props as any;
+    const isOwner = auth.user.roles?.includes('owner');
+    const canManageCustomers = !isOwner; // Owner read-only
+
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
     
@@ -208,9 +221,17 @@ function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
 
     const columns: ColumnDef<Customer>[] = [
         {
-            accessorKey: "name",
+            accessorKey: "user.name",
             header: "Nama Pelanggan",
-            cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                     <Avatar className="h-8 w-8">
+                        <AvatarImage src={row.original.user.avatar ? `/storage/${row.original.user.avatar}` : `https://ui-avatars.com/api/?name=${row.original.user.name}&background=random`} />
+                        <AvatarFallback><UserIcon className="h-4 w-4" /></AvatarFallback>
+                    </Avatar>
+                    <div className="font-medium">{row.original.user.name}</div>
+                </div>
+            )
         },
         {
             accessorKey: "phone",
@@ -218,7 +239,7 @@ function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="text-sm font-medium">{row.getValue("phone")}</span>
-                    {row.original.email && <span className="text-xs text-muted-foreground">{row.original.email}</span>}
+                    {row.original.user.email && <span className="text-xs text-muted-foreground">{row.original.user.email}</span>}
                 </div>
             )
         },
@@ -230,7 +251,10 @@ function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
                 return <div className="max-w-[250px] truncate text-muted-foreground" title={address || ''}>{address || '-'}</div>
             }
         },
-        {
+    ];
+
+    if (canManageCustomers) {
+        columns.push({
             id: "actions",
             cell: ({ row }) => {
                 const customer = row.original;
@@ -259,8 +283,8 @@ function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
                     </div>
                 );
             },
-        },
-    ];
+        });
+    }
 
     return (
         <>
@@ -273,43 +297,49 @@ function CustomersIndex({ customers }: { customers: { data: Customer[] } }) {
                         Kelola data pelanggan dan riwayat informasi kontak mereka.
                     </p>
                 </div>
-                <Button onClick={openCreateDialog} size="lg">
-                    <Plus className="mr-2 h-4 w-4" /> Tambah Pelanggan
-                </Button>
+                {canManageCustomers && (
+                    <Button onClick={openCreateDialog} size="lg">
+                        <Plus className="mr-2 h-4 w-4" /> Tambah Pelanggan
+                    </Button>
+                )}
             </div>
 
             <div className="mt-8">
                 <DataTable columns={columns} data={customers.data} pagination={customers} searchKey="name" />
             </div>
 
-            <CustomerForm 
-                isOpen={isDialogOpen} 
-                setIsOpen={setIsDialogOpen} 
-                customer={editingCustomer} 
-            />
+            {canManageCustomers && (
+                <>
+                    <CustomerForm 
+                        isOpen={isDialogOpen} 
+                        setIsOpen={setIsDialogOpen} 
+                        customer={editingCustomer} 
+                    />
 
-            {/* Alert Dialog Delete */}
-            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Tindakan ini tidak dapat dibatalkan. Data pelanggan ini akan dihapus permanen dari server.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={(e) => { e.preventDefault(); handleDelete(); }}
-                            disabled={isDeleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash className="mr-2 h-4 w-4" />}
-                            {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    {/* Alert Dialog Delete */}
+                    <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Tindakan ini tidak dapat dibatalkan. Data pelanggan ini akan dihapus permanen dari server.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
+                                <AlertDialogAction 
+                                    onClick={(e) => { e.preventDefault(); handleDelete(); }}
+                                    disabled={isDeleting}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash className="mr-2 h-4 w-4" />}
+                                    {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </>
+            )}
         </>
     );
 }
