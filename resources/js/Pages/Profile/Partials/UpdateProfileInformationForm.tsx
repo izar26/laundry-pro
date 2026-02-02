@@ -8,6 +8,15 @@ import { Transition } from '@headlessui/react';
 import { FormEventHandler } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
 
+interface UpdateProfileForm {
+    _method: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    avatar: File | null;
+}
+
 export default function UpdateProfileInformation({
     mustVerifyEmail,
     status,
@@ -20,13 +29,13 @@ export default function UpdateProfileInformation({
     const user = usePage().props.auth.user;
 
     const { data, setData, post, errors, processing, recentlySuccessful } =
-        useForm({
+        useForm<UpdateProfileForm>({
             _method: 'PATCH',
             name: user.name,
             email: user.email,
             phone: user.phone || '',
             address: user.address || '',
-            avatar: null as File | null,
+            avatar: null,
         });
 
     const submit: FormEventHandler = (e) => {

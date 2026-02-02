@@ -117,17 +117,7 @@ export default function Login({
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold pl-1">Password</Label>
-                                {canResetPassword && (
-                                    <Link
-                                        href={route('password.request')}
-                                        className="text-xs font-medium text-primary hover:text-primary/80 hover:underline"
-                                    >
-                                        Lupa?
-                                    </Link>
-                                )}
-                            </div>
+                            <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold pl-1">Password</Label>
                             <Input
                                 id="password"
                                 type="password"
@@ -163,6 +153,16 @@ export default function Login({
                             )}
                             Masuk Sekarang
                         </Button>
+
+                        <div className="mt-4 text-center text-sm">
+                            <span className="text-muted-foreground">Belum punya akun? </span>
+                            <Link
+                                href={route('register')}
+                                className="font-medium text-primary hover:text-primary/80 hover:underline"
+                            >
+                                Daftar sebagai pelanggan
+                            </Link>
+                        </div>
                     </form>
                 </motion.div>
                 
