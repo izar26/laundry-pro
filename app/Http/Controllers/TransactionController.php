@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Service;
 use App\Models\Promotion;
 use App\Models\Setting; // Import Setting yang benar
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;

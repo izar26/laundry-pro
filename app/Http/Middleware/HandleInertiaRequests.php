@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'midtrans_client_key' => config('services.midtrans.client_key'),
+            'midtrans_is_production' => filter_var(config('services.midtrans.is_production'), FILTER_VALIDATE_BOOLEAN),
             'app_settings' => $appSettings,
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),

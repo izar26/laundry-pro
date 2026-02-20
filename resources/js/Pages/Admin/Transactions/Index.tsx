@@ -153,7 +153,7 @@ const StatusCell = ({ row, isReadOnly = false }: { row: any, isReadOnly?: boolea
 
 const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { transactions: { data: Transaction[] }, kanbanData: Transaction[], stats: Stats, filters: any }) => {
     
-    const { midtrans_client_key, auth } = usePage().props as any;
+    const { midtrans_client_key, midtrans_is_production, auth } = usePage().props as any;
     const user = auth.user;
     const isPelanggan = user.roles?.includes('pelanggan');
     const isOwner = user.roles?.includes('owner');
@@ -187,14 +187,16 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
 
     useEffect(() => {
         if (!midtrans_client_key) return;
-        const snapScript = "https://app.sandbox.midtrans.com/snap/snap.js";
+        const baseUrl = midtrans_is_production 
+            ? "https://app.midtrans.com/snap/snap.js" 
+            : "https://app.sandbox.midtrans.com/snap/snap.js";
         const script = document.createElement("script");
-        script.src = snapScript;
+        script.src = baseUrl;
         script.setAttribute("data-client-key", midtrans_client_key);
         script.async = true;
         document.body.appendChild(script);
         return () => { if (document.body.contains(script)) document.body.removeChild(script); };
-    }, [midtrans_client_key]);
+    }, [midtrans_client_key, midtrans_is_production]);
 
     const handleCheckStatus = (id: number) => {
         setIsChecking(id);

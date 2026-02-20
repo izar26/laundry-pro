@@ -156,7 +156,7 @@ function TransactionCreate({ customers, services, promotions }: {
     services: Service[], 
     promotions: Promotion[] 
 }) {
-    const { midtrans_client_key, auth } = usePage().props as any;
+    const { midtrans_client_key, midtrans_is_production, auth } = usePage().props as any;
     const user = auth.user;
     const isCustomerRole = user.roles?.includes('pelanggan');
     
@@ -369,12 +369,15 @@ function TransactionCreate({ customers, services, promotions }: {
     useEffect(() => {
         if (!midtrans_client_key) return;
         const script = document.createElement("script");
-        script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
+        const baseUrl = midtrans_is_production 
+            ? "https://app.midtrans.com/snap/snap.js" 
+            : "https://app.sandbox.midtrans.com/snap/snap.js";
+        script.src = baseUrl;
         script.setAttribute("data-client-key", midtrans_client_key);
         script.async = true;
         document.body.appendChild(script);
         return () => { if (document.body.contains(script)) document.body.removeChild(script); };
-    }, [midtrans_client_key]);
+    }, [midtrans_client_key, midtrans_is_production]);
 
     const filteredServices = services.filter(service => {
         const matchesSearch = service.name.toLowerCase().includes(serviceSearch.toLowerCase());
