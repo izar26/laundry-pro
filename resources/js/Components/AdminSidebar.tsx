@@ -9,7 +9,7 @@ import {
 } from "@/Components/ui/tooltip";
 import { 
     LayoutDashboard, Users, ShoppingBag, Shirt, TrendingUp, 
-    Settings, Store, FileText, ChevronLeft, Plus, LogOut, User
+    Settings, Store, FileText, ChevronLeft, Plus, LogOut, User, ScanLine
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/Components/ui/avatar';
@@ -44,6 +44,8 @@ export function AdminSidebar({ isCollapsed, toggleCollapse }: AdminSidebarProps)
     ];
 
     const adminItems = [
+        { name: 'Scan Absen', url: route('attendances.scanner'), icon: ScanLine },
+        { name: 'Data Absen', url: route('attendances.index'), icon: FileText },
         { name: 'Laporan', url: route('reports.index'), icon: FileText },
         { name: 'Pegawai', url: route('employees.index'), icon: Users },
         { name: 'Info Laundry', url: route('settings.index'), icon: Store },

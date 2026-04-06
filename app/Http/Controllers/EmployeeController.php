@@ -136,4 +136,37 @@ class EmployeeController extends Controller
 
         return redirect()->back()->with('message', 'Pegawai dihapus.');
     }
+
+    public function idCard($id)
+    {
+        $employee = Employee::with('user')->findOrFail($id);
+        return Inertia::render('Admin/Employees/IdCard', [
+            'employee' => $employee
+        ]);
+    }
+
+    public function bulkIdCard(Request $request)
+    {
+        $ids = $request->query('ids');
+        
+        // Exclude Admin & Owner
+        $query = Employee::with('user')
+            ->whereNotIn('position', ['Owner', 'Administrator', 'owner', 'admin']);
+            
+        if ($ids && $ids !== 'all') {
+            $idArray = explode(',', $ids);
+            $query->whereIn('id', $idArray);
+        }
+
+        $employees = $query->get();
+
+        if ($employees->isEmpty()) {
+            return redirect()->back()->with('message', 'Tidak ada data pegawai yang dipilih atau memenuhi syarat pencetakan.');
+        }
+
+        return Inertia::render('Admin/Employees/BulkIdCard', [
+            'employees' => $employees,
+            'title' => $ids === 'all' ? 'Cetak Semua ID Card' : 'Cetak ' . $employees->count() . ' ID Card Pilihan'
+        ]);
+    }
 }

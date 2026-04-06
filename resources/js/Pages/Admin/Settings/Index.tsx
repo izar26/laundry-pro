@@ -19,6 +19,8 @@ function SettingsIndex({ settings }: { settings: any }) {
         app_phone: settings.app_phone || '',
         app_address: settings.app_address || '',
         app_logo: null as File | null,
+        attendance_time_in: settings.attendance_time_in || '08:00',
+        attendance_time_out: settings.attendance_time_out || '17:00',
     });
 
     const [logoPreview, setLogoPreview] = useState<string | null>(
@@ -141,6 +143,30 @@ function SettingsIndex({ settings }: { settings: any }) {
                                             />
                                         </div>
                                         {errors.app_address && <p className="text-xs text-destructive">{errors.app_address}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2 mt-4 pt-4 border-t">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="attendance_time_in">Jam Masuk (Tap In)</Label>
+                                        <Input 
+                                            id="attendance_time_in" 
+                                            type="time" step="1"
+                                            value={data.attendance_time_in} 
+                                            onChange={(e) => setData('attendance_time_in', e.target.value)} 
+                                            readOnly={isOwner}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">Karyawan yang absen di atas jam ini akan terhitung <span className="text-red-500 font-bold">Terlambat</span>.</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="attendance_time_out">Jam Pulang (Tap Out)</Label>
+                                        <Input 
+                                            id="attendance_time_out" 
+                                            type="time" step="1"
+                                            value={data.attendance_time_out} 
+                                            onChange={(e) => setData('attendance_time_out', e.target.value)} 
+                                            readOnly={isOwner}
+                                        />
                                     </div>
                                 </div>
 

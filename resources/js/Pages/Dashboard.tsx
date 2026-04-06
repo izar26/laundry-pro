@@ -28,6 +28,8 @@ import { id as idLocale } from 'date-fns/locale';
 import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
 
+import { QRCodeSVG } from 'qrcode.react';
+
 // Komponen Pembantu
 const StatCard = ({ title, value, icon: Icon, color, spotlight, desc }: any) => (
     <SpotlightCard className="h-full" spotlightColor={spotlight || "rgba(255, 255, 255, 0.2)"}>
@@ -42,7 +44,7 @@ const StatCard = ({ title, value, icon: Icon, color, spotlight, desc }: any) => 
     </SpotlightCard>
 );
 
-const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
+const Dashboard = ({ stats, chartData, recentTransactions, myEmployeeData }: any) => {
     
     const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
     const isPelanggan = stats.is_pelanggan;
@@ -65,6 +67,37 @@ const Dashboard = ({ stats, chartData, recentTransactions }: any) => {
             <Head title="Dashboard" />
             
             <div className="flex flex-col gap-6">
+                {/* ID Card / QR Widget untuk Pegawai */}
+                {!isPelanggan && myEmployeeData && myEmployeeData.qr_token && (
+                    <Card className="border-none shadow-md overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+                        <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between">
+                            <div className="mb-4 md:mb-0 text-center md:text-left">
+                                <h3 className="text-xl font-bold mb-1">Kartu Absensi Pegawai</h3>
+                                <p className="text-blue-100 text-sm">Gunakan QR Code ini untuk Tap In & Tap Out pada mesin Scanner Admin.</p>
+                                <div className="mt-4 flex items-center gap-2 justify-center md:justify-start">
+                                    <Badge variant="outline" className="text-white border-white/40 bg-white/10 shadow-sm px-3 py-1 text-sm font-medium">
+                                        NIP: {myEmployeeData.nip || '-'}
+                                    </Badge>
+                                </div>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl shadow-lg shrink-0 flex flex-col items-center gap-2">
+                                <QRCodeSVG 
+                                    value={myEmployeeData.qr_token} 
+                                    size={100}
+                                    level={"H"}
+                                    fgColor={"#1f2937"}
+                                />
+                                <a 
+                                    href={route('my.idcard')} 
+                                    className="text-[10px] font-bold text-center w-full block hover:underline text-gray-800"
+                                >
+                                    Cetak Penuh
+                                </a>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Stats Cards Row */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard 

@@ -25,7 +25,7 @@ import {
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Textarea } from '@/Components/ui/textarea';
-import { Plus, Pencil, Trash, MoreHorizontal, Loader2, User as UserIcon } from 'lucide-react';
+import { Plus, Pencil, Trash, MoreHorizontal, Loader2, User as UserIcon, Printer } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -204,6 +204,8 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    
     const { delete: destroy, processing: isDeleting } = useForm({});
 
     const openCreateDialog = () => {
@@ -234,12 +236,34 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
 
     const columns: ColumnDef<Employee>[] = [
         {
+            id: "select",
+            header: "",
+            cell: ({ row }) => {
+                const emp = row.original;
+                const pos = emp.position?.toLowerCase() || '';
+                if (['owner', 'administrator', 'admin'].includes(pos)) {
+                    return <div className="w-4" />;
+                }
+                return (
+                    <input 
+                        type="checkbox" 
+                        checked={selectedIds.includes(emp.id)} 
+                        onChange={(e) => {
+                            if (e.target.checked) setSelectedIds([...selectedIds, emp.id]);
+                            else setSelectedIds(selectedIds.filter(id => id !== emp.id));
+                        }} 
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                );
+            }
+        },
+        {
             accessorKey: "user.name",
             header: "Nama Pegawai",
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={row.original.user.avatar ? `/storage/${row.original.user.avatar}` : `https://ui-avatars.com/api/?name=${row.original.user.name}&background=random`} />
+                        <AvatarImage src={row.original.user.avatar ? `/storage/${row.original.user.avatar}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(row.original.user.name)}&background=random`} />
                         <AvatarFallback><UserIcon className="h-4 w-4" /></AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
@@ -271,6 +295,8 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
             cell: ({ row }) => {
                 const employee = row.original;
                 const isMe = employee.user.id === currentUser.id;
+                const pos = employee.position?.toLowerCase() || '';
+                const isAdminOrOwner = ['owner', 'administrator', 'admin'].includes(pos);
 
                 return (
                     <div className="flex justify-end">
@@ -281,6 +307,11 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                                {!isAdminOrOwner && (
+                                    <DropdownMenuItem onClick={() => window.open(route('employees.idcard', employee.id), '_blank')}>
+                                        <Printer className="mr-2 h-4 w-4" /> Cetak ID Card
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => openEditDialog(employee)}>
                                     <Pencil className="mr-2 h-4 w-4" /> Edit Data
                                 </DropdownMenuItem>
@@ -308,9 +339,27 @@ function EmployeesIndex({ employees }: { employees: { data: Employee[] } }) {
                     <p className="text-muted-foreground">Kelola akun staf yang memiliki akses ke sistem.</p>
                 </div>
                 {canManageEmployees && (
-                    <Button onClick={openCreateDialog} size="lg">
-                        <Plus className="mr-2 h-4 w-4" /> Tambah Pegawai
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        {selectedIds.length > 0 && (
+                            <Button 
+                                onClick={() => window.open(route('employees.bulk-id-card', { ids: selectedIds.join(',') }), '_blank')} 
+                                variant="outline" 
+                                className="border-blue-300 text-blue-700 bg-blue-50/50 hover:bg-blue-100 hidden sm:flex"
+                            >
+                                <Printer className="mr-2 h-4 w-4" /> Cetak {selectedIds.length} Pilihan
+                            </Button>
+                        )}
+                        <Button 
+                            onClick={() => window.open(route('employees.bulk-id-card', { ids: 'all' }), '_blank')} 
+                            variant="secondary"
+                            className="hidden sm:flex"
+                        >
+                            <Printer className="mr-2 h-4 w-4" /> Cetak Semua
+                        </Button>
+                        <Button onClick={openCreateDialog} size="lg">
+                            <Plus className="mr-2 h-4 w-4" /> Tambah Pegawai
+                        </Button>
+                    </div>
                 )}
             </div>
             <div className="mt-8">

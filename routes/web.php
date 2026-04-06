@@ -26,6 +26,7 @@ Route::get('/queue', [QueueController::class, 'index'])->name('queue.index');
 Route::middleware('auth')->group(function () {
     // --- Rute yang bisa diakses SEMUA User yang Login (Termasuk Pegawai & Pelanggan) ---
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/my-id-card', [DashboardController::class, 'myIdCard'])->name('my.idcard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -96,6 +97,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
         Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+        Route::get('/employees/{employee}/id-card', [EmployeeController::class, 'idCard'])->name('employees.idcard');
+        Route::get('/employees/bulk-id-card', [EmployeeController::class, 'bulkIdCard'])->name('employees.bulk-id-card');
         
         // Services & Promotions (Write)
         Route::resource('services', ServiceController::class)->except(['index']);
@@ -103,6 +106,13 @@ Route::middleware('auth')->group(function () {
         
         // Settings (Update)
         Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+        
+        // Attendances
+        Route::get('/attendances/scanner', [\App\Http\Controllers\Admin\AttendanceController::class, 'scanner'])->name('attendances.scanner');
+        Route::post('/attendances/record', [\App\Http\Controllers\Admin\AttendanceController::class, 'record'])->name('attendances.record');
+        Route::get('/attendances/report', [\App\Http\Controllers\Admin\AttendanceController::class, 'index'])->name('attendances.index');
+        Route::post('/attendances/update-status', [\App\Http\Controllers\Admin\AttendanceController::class, 'updateStatus'])->name('attendances.update-status');
+        Route::get('/attendances/export', [\App\Http\Controllers\Admin\AttendanceController::class, 'export'])->name('attendances.export');
     });
 });
 

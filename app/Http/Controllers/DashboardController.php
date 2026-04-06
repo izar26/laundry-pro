@@ -126,10 +126,31 @@ class DashboardController extends Controller
                 });
         }
 
+        $myEmployeeData = null;
+        if (!$isPelanggan) {
+            $employeeData = \App\Models\Employee::where('user_id', $user->id)->first();
+            if ($employeeData && !in_array(strtolower($employeeData->position), ['owner', 'administrator', 'admin'])) {
+                $myEmployeeData = $employeeData;
+            }
+        }
+
         return Inertia::render('Dashboard', [
             'stats' => $stats,
             'chartData' => $chartData,
             'recentTransactions' => $recentTransactions,
+            'myEmployeeData' => $myEmployeeData,
+        ]);
+    }
+
+    public function myIdCard(Request $request)
+    {
+        $user = $request->user();
+        if ($user->hasRole('pelanggan')) abort(403);
+        
+        $employee = \App\Models\Employee::with('user')->where('user_id', $user->id)->firstOrFail();
+        
+        return Inertia::render('Admin/Employees/IdCard', [
+            'employee' => $employee
         ]);
     }
 }

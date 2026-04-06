@@ -12,6 +12,7 @@ class Employee extends Model
 
     protected $fillable = [
         'user_id',
+        'qr_token',
         'phone',
         'address',
         'nip',

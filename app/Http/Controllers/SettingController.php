@@ -25,12 +25,20 @@ class SettingController extends Controller
             'app_phone' => 'required|string|max:20',
             'app_address' => 'required|string',
             'app_logo' => 'nullable|image|max:2048', // Max 2MB
+            'attendance_time_in' => 'nullable|string',
+            'attendance_time_out' => 'nullable|string',
         ]);
 
         // Update Teks
         Setting::updateOrCreate(['key' => 'app_name'], ['value' => $validated['app_name']]);
         Setting::updateOrCreate(['key' => 'app_phone'], ['value' => $validated['app_phone']]);
         Setting::updateOrCreate(['key' => 'app_address'], ['value' => $validated['app_address']]);
+        if (isset($validated['attendance_time_in'])) {
+            Setting::updateOrCreate(['key' => 'attendance_time_in'], ['value' => $validated['attendance_time_in']]);
+        }
+        if (isset($validated['attendance_time_out'])) {
+            Setting::updateOrCreate(['key' => 'attendance_time_out'], ['value' => $validated['attendance_time_out']]);
+        }
 
         // Upload Logo
         if ($request->hasFile('app_logo')) {
