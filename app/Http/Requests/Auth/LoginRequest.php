@@ -59,7 +59,7 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 3)) {
             return;
         }
 
@@ -80,6 +80,7 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        // Menggunakan IP saja agar bot tidak bisa mencoba-coba banyak email dari 1 IP yang sama
+        return Str::transliterate($this->ip());
     }
 }

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 export default function Index({ attendances: initialAttendances, employees, filters }: any) {
     const [attendances, setAttendances] = useState(initialAttendances);
     const [isLoading, setIsLoading] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
@@ -67,13 +68,37 @@ export default function Index({ attendances: initialAttendances, employees, filt
         }
     }, [date?.from, date?.to]);
 
-    const handleExport = () => {
-        const url = new URL(route('attendances.export'), window.location.origin);
-        if (date?.from) url.searchParams.set('start_date', format(date.from, 'yyyy-MM-dd'));
-        if (date?.to) url.searchParams.set('end_date', format(date.to, 'yyyy-MM-dd'));
-        url.searchParams.append('employee_id', employeeId);
-        url.searchParams.append('status', status);
-        window.open(url.toString(), '_blank');
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const url = new URL(route('attendances.export'), window.location.origin);
+            if (date?.from) url.searchParams.set('start_date', format(date.from, 'yyyy-MM-dd'));
+            if (date?.to) url.searchParams.set('end_date', format(date.to, 'yyyy-MM-dd'));
+            url.searchParams.append('employee_id', employeeId);
+            url.searchParams.append('status', status);
+
+            const response = await axios.get(url.toString(), {
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            
+            const fileName = `Laporan_Absensi_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            toast.success("Berhasil mengekspor Laporan Excel");
+        } catch (error) {
+            console.error("Export error", error);
+            toast.error("Gagal mengekspor Laporan Excel");
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const updateStatus = async (employee_id: number, targetDate: string, newStatus: string) => {
@@ -200,8 +225,12 @@ export default function Index({ attendances: initialAttendances, employees, filt
                         <div className="flex items-center gap-2 w-full xl:w-auto justify-end">
                             <Button size="sm" variant="ghost" onClick={() => applyFilters(date?.from, date?.to, 'all', 'all')} title="Reset Filter" className="h-10 w-10 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"><FilterX className="h-4 w-4"/></Button>
                             <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
-                            <Button size="sm" variant="outline" onClick={handleExport} className="h-10 gap-2 border-dashed border-emerald-500/50 hover:bg-emerald-50 text-emerald-700">
-                                <FileDown className="h-4 w-4" /> <span className="hidden sm:inline font-bold">Unduh .XLSX</span>
+                            <Button size="sm" variant="outline" onClick={handleExport} disabled={isExporting} className="h-10 gap-2 border-dashed border-emerald-500/50 hover:bg-emerald-50 text-emerald-700">
+                                {isExporting ? (
+                                    <><div className="h-4 w-4 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin"></div> <span className="hidden sm:inline font-bold">Memproses...</span></>
+                                ) : (
+                                    <><FileDown className="h-4 w-4" /> <span className="hidden sm:inline font-bold">Unduh</span></>
+                                )}
                             </Button>
                         </div>
                     </div>

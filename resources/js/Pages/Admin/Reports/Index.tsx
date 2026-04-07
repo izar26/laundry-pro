@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
+import axios from 'axios';
+import { toast } from 'sonner';
 import { Button } from '@/Components/ui/button';
 import { DataTable } from '@/Components/ui/data-table/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -191,6 +193,7 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
     });
 
     const [isFiltering, setIsFiltering] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const applyFilter = (fromDate: Date | undefined, toDate: Date | undefined, customService?: string) => {
         setIsFiltering(true);
@@ -228,12 +231,36 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
         applyFilter(from, to);
     };
 
-    const handleExport = () => {
-        const url = route('reports.export', { 
-            start_date: date?.from ? format(date.from, 'yyyy-MM-dd') : '', 
-            end_date: date?.to ? format(date.to, 'yyyy-MM-dd') : '' 
-        });
-        window.location.href = url;
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const url = route('reports.export', { 
+                start_date: date?.from ? format(date.from, 'yyyy-MM-dd') : '', 
+                end_date: date?.to ? format(date.to, 'yyyy-MM-dd') : '' 
+            });
+
+            const response = await axios.get(url, {
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            
+            const fileName = `Laporan_Keuangan_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            toast.success("Berhasil mengekspor Laporan Keuangan");
+        } catch (error) {
+            console.error("Export error", error);
+            toast.error("Gagal mengekspor Laporan Keuangan");
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
@@ -362,8 +389,12 @@ export default function ReportsIndex({ summary, dailyRevenue, topServices, trans
                         </Button>
                         <Button size="sm" variant="ghost" onClick={handleReset} title="Reset Filter" className="h-10 w-10 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"><FilterX className="h-4 w-4"/></Button>
                         <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
-                        <Button size="sm" variant="outline" onClick={handleExport} className="h-10 gap-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5">
-                            <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Export Excel</span>
+                        <Button size="sm" variant="outline" onClick={handleExport} disabled={isExporting} className="h-10 gap-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5">
+                            {isExporting ? (
+                                <><div className="h-3.5 w-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> <span className="hidden sm:inline">Memproses...</span></>
+                            ) : (
+                                <><Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Export Excel</span></>
+                            )}
                         </Button>
                     </div>
                 </motion.div>
