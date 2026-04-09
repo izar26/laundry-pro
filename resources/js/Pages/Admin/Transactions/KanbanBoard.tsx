@@ -99,12 +99,12 @@ export default function KanbanBoard({ transactions }: { transactions: Transactio
     const formatRupiah = (val: string) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(parseFloat(val));
 
     return (
-        <div className="h-full overflow-x-auto pb-4">
+        <div className="h-full pt-2 pb-4 overflow-x-auto">
             <DragDropContext onDragEnd={onDragEnd}>
-                <div className="flex gap-4 min-w-[1000px]">
+                <div className="flex gap-4 min-w-[1000px] h-full">
                     {Object.values(columns).map((column) => (
-                        <div key={column.id} className="w-1/4 min-w-[250px] flex flex-col gap-2">
-                            <div className={cn("p-3 rounded-lg border font-bold text-sm flex justify-between items-center shadow-sm", column.color)}>
+                        <div key={column.id} className="w-1/4 min-w-[250px] flex flex-col gap-2 h-full">
+                            <div className={cn("p-3 rounded-lg border font-bold text-sm flex justify-between items-center shadow-sm shrink-0", column.color)}>
                                 {column.title}
                                 <Badge variant="secondary" className="bg-background/50">{column.items.length}</Badge>
                             </div>
@@ -114,7 +114,7 @@ export default function KanbanBoard({ transactions }: { transactions: Transactio
                                         {...provided.droppableProps}
                                         ref={provided.innerRef}
                                         className={cn(
-                                            "flex-1 rounded-lg p-2 transition-colors min-h-[500px]",
+                                            "flex-1 rounded-lg p-2 transition-colors overflow-y-auto",
                                             snapshot.isDraggingOver ? "bg-accent/50" : "bg-transparent"
                                         )}
                                     >
