@@ -71,10 +71,10 @@ class RoleSeeder extends Seeder
         
         // Admin
         $admin = User::firstOrCreate(
-            ['email' => 'admin@laundry.test'],
+            ['email' => 'admin@gmail.com'],
             [
                 'name' => 'Admin Sistem',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]
         );
@@ -87,10 +87,10 @@ class RoleSeeder extends Seeder
 
         // Owner
         $owner = User::firstOrCreate(
-            ['email' => 'owner@laundry.test'],
+            ['email' => 'owner@gmail.com'],
             [
                 'name' => 'Pemilik Laundry',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]
         );
@@ -103,10 +103,10 @@ class RoleSeeder extends Seeder
 
         // Pegawai Dummy (Default)
         $pegawai = User::firstOrCreate(
-            ['email' => 'pegawai@laundry.test'],
+            ['email' => 'pegawai@gmail.com'],
             [
                 'name' => 'Staff Pegawai',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]
         );
@@ -118,10 +118,10 @@ class RoleSeeder extends Seeder
 
         // Pelanggan Dummy (Default)
         $pelanggan = User::firstOrCreate(
-            ['email' => 'pelanggan@laundry.test'],
+            ['email' => 'pelanggan@gmail.com'],
             [
                 'name' => 'Pelanggan Setia',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]
         );
