@@ -307,7 +307,7 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
             cell: ({ row }) => {
                 const status = row.getValue("payment_status") as string;
                 return (
-                    <Badge variant={status === 'paid' ? 'outline' : 'destructive'} className={cn("capitalize text-[10px]", status === 'paid' ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : '')}>
+                    <Badge variant={status === 'paid' ? 'outline' : 'destructive'} className={cn("capitalize text-[10px] whitespace-nowrap", status === 'paid' ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : '')}>
                         {status === 'paid' ? 'Lunas' : 'Belum Lunas'}
                     </Badge>
                 )
