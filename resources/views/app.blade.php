@@ -12,6 +12,9 @@
         @endphp
         <title inertia>{{ $appName }}</title>
         <link rel="icon" href="{{ $faviconUrl }}" />
+        <script>
+            window.appName = "{{ $appName }}";
+        </script>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
