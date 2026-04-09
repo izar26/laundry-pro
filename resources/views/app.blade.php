@@ -4,7 +4,14 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        @php
+            $appSettings = $page['props']['app_settings'] ?? [];
+            $appName = $appSettings['app_name'] ?? config('app.name', 'Laundry Pro');
+            $appLogo = $appSettings['app_logo'] ?? null;
+            $faviconUrl = $appLogo ? asset('storage/' . $appLogo) : '/favicon.svg';
+        @endphp
+        <title inertia>{{ $appName }}</title>
+        <link rel="icon" href="{{ $faviconUrl }}" />
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
