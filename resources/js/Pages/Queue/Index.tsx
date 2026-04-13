@@ -1,27 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shirt, CheckCircle2, Clock } from 'lucide-react';
+import { Shirt, CheckCircle2, Clock, Inbox, PlayCircle, Check, XCircle } from 'lucide-react';
 
 type Transaction = {
     id: number;
     invoice_code: string;
-    customer: { name: string } | null;
+    status: string;
+    time: string;
+    customer?: { name: string } | null;
 };
 
-export default function QueueIndex({ processing, ready }: { processing: Transaction[], ready: Transaction[] }) {
+type QueueProps = {
+    queue: {
+        pending: Transaction[];
+        new: Transaction[];
+        process: Transaction[];
+        ready: Transaction[];
+        done: Transaction[];
+        cancelled: Transaction[];
+    }
+};
+
+export default function QueueIndex({ queue }: QueueProps) {
     
     // Auto Refresh setiap 10 detik
     useEffect(() => {
         const interval = setInterval(() => {
-            router.reload({ only: ['processing', 'ready'] });
+            router.reload({ only: ['queue'] });
         }, 10000);
         return () => clearInterval(interval);
     }, []);
 
     // Format nama agar privasi terjaga (Budi Santoso -> Budi S.)
     const formatName = (name?: string | null) => {
-        if (!name) return 'Pelanggan';
+        if (!name) return 'Pelanggan Biasa';
         const parts = name.split(' ');
         if (parts.length > 1) {
             return `${parts[0]} ${parts[1][0]}.`;
@@ -29,118 +42,153 @@ export default function QueueIndex({ processing, ready }: { processing: Transact
         return name;
     };
 
+    const newOrders = [...queue.pending, ...queue.new];
+    const completedOrders = [...queue.done, ...queue.cancelled];
+
     return (
-        <div className="min-h-screen bg-slate-950 text-white p-8 flex flex-col font-sans overflow-hidden">
-            <Head title="Antrian Laundry" />
+        <div className="min-h-screen bg-slate-50 text-slate-800 p-8 flex flex-col font-sans overflow-hidden">
+            <Head title="Live Queue Board" />
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 bg-white p-6 rounded-2xl shadow-sm">
                 <div className="flex items-center gap-4">
-                    <div className="bg-blue-600 p-3 rounded-xl">
-                        <Shirt className="h-10 w-10 text-white" />
+                    <div className="bg-blue-100 p-3 rounded-xl border border-blue-200">
+                        <Shirt className="h-10 w-10 text-blue-600" />
                     </div>
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                            STATUS CUCIAN
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900">
+                            LIVE QUEUE BOARD
                         </h1>
-                        <p className="text-slate-400 text-lg">Update Real-time</p>
+                        <p className="text-slate-500 font-medium tracking-wide">Pantau status layanan laundry Anda di sini</p>
                     </div>
                 </div>
-                <div className="text-right">
-                    <Clock className="h-8 w-8 text-slate-500 inline-block mr-2" />
-                    <span className="text-3xl font-mono font-bold text-slate-300">
+                <div className="text-right flex items-center justify-center bg-slate-100 rounded-xl px-6 py-4 border border-slate-200">
+                    <Clock className="h-6 w-6 text-slate-500 mr-3" />
+                    <span className="text-3xl font-mono font-bold text-slate-800 tracking-tight">
                         {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
             </div>
 
-            {/* Content Split */}
-            <div className="flex-1 grid grid-cols-2 gap-12">
+            {/* Grid 4 Kolom Status */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 
-                {/* Kolom Sedang Proses */}
-                <div className="bg-slate-900/50 rounded-3xl p-6 border border-slate-800/50 flex flex-col relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
-                    <h2 className="text-3xl font-bold mb-8 flex items-center gap-3 text-blue-400">
-                        <LoaderIcon /> SEDANG DIPROSES
-                    </h2>
-                    
-                    <div className="space-y-4 flex-1 overflow-y-auto scrollbar-hide pr-2">
-                        <AnimatePresence mode="popLayout">
-                            {processing.map((item) => (
-                                <motion.div
-                                    key={item.id}
-                                    layout
-                                    initial={{ opacity: 0, x: -50 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, scale: 0.5 }}
-                                    className="bg-slate-800 rounded-2xl p-6 flex justify-between items-center shadow-lg border border-slate-700/50"
-                                >
-                                    <div>
-                                        <span className="text-2xl font-bold block">{formatName(item.customer?.name)}</span>
-                                        <span className="text-slate-500 font-mono text-lg">{item.invoice_code}</span>
-                                    </div>
-                                    <div className="h-4 w-4 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_#3b82f6]"></div>
-                                </motion.div>
-                            ))}
-                            {processing.length === 0 && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-slate-600 mt-20 text-xl">
-                                    Tidak ada antrian cuci.
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                </div>
+                {/* Kolom BARU */}
+                <QueueColumn 
+                    title="Pesanan Baru" 
+                    icon={<Inbox className="h-6 w-6 text-slate-500" />} 
+                    colorClass="border-slate-300 bg-slate-100 text-slate-800"
+                    headerBg="bg-slate-200 text-slate-700"
+                    items={newOrders}
+                    formatName={formatName}
+                />
 
-                {/* Kolom Siap Ambil */}
-                <div className="bg-slate-900/50 rounded-3xl p-6 border border-slate-800/50 flex flex-col relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
-                    <h2 className="text-3xl font-bold mb-8 flex items-center gap-3 text-emerald-400">
-                        <CheckCircle2 className="h-8 w-8" /> SIAP DIAMBIL
-                    </h2>
+                {/* Kolom PROSES */}
+                <QueueColumn 
+                    title="Sedang Diproses" 
+                    icon={<PlayCircle className="h-6 w-6 text-blue-500" />} 
+                    colorClass="border-blue-200 bg-blue-50/50"
+                    headerBg="bg-blue-100 text-blue-800"
+                    items={queue.process}
+                    formatName={formatName}
+                    pulseBadge
+                />
 
-                    <div className="space-y-4 flex-1 overflow-y-auto scrollbar-hide pr-2">
-                        <AnimatePresence mode="popLayout">
-                            {ready.map((item) => (
-                                <motion.div
-                                    key={item.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, x: 50 }}
-                                    className="bg-emerald-900/20 rounded-2xl p-6 flex justify-between items-center shadow-lg border border-emerald-500/30"
-                                >
-                                    <div>
-                                        <span className="text-3xl font-black block text-emerald-100">{formatName(item.customer?.name)}</span>
-                                        <span className="text-emerald-400/70 font-mono text-lg">{item.invoice_code}</span>
-                                    </div>
-                                    <div className="bg-emerald-500 text-slate-950 px-4 py-1 rounded-full font-bold text-sm">READY</div>
-                                </motion.div>
-                            ))}
-                             {ready.length === 0 && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-slate-600 mt-20 text-xl">
-                                    Belum ada cucian selesai.
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                </div>
+                {/* Kolom READY */}
+                <QueueColumn 
+                    title="Siap Diambil" 
+                    icon={<CheckCircle2 className="h-6 w-6 text-emerald-600" />} 
+                    colorClass="border-emerald-200 bg-emerald-50/50 shadow-sm"
+                    headerBg="bg-emerald-100 text-emerald-800"
+                    items={queue.ready}
+                    formatName={formatName}
+                    highlightCard
+                />
+
+                {/* Kolom SELESAI */}
+                <QueueColumn 
+                    title="Selesai / Batal" 
+                    icon={<Check className="h-6 w-6 text-slate-500" />} 
+                    colorClass="border-slate-200 bg-white"
+                    headerBg="bg-gray-100 text-gray-700"
+                    items={completedOrders}
+                    formatName={formatName}
+                    opacityCard
+                />
 
             </div>
 
-            {/* Footer ticker */}
-            <div className="mt-8 pt-4 border-t border-slate-800 text-center text-slate-500 text-sm">
-                <p>Silakan tunjukkan struk saat pengambilan • Terima Kasih</p>
+            {/* Footer */}
+            <div className="mt-8 pt-4 text-center text-slate-500 font-medium">
+                <p>Terima Kasih Atas Kepercayaan Anda! • Siapkan struk saat pengambilan.</p>
             </div>
         </div>
     );
 }
 
-// Custom Loader Icon
-function LoaderIcon() {
+// Sub Komponen Kolom Kanban
+function QueueColumn({ 
+    title, icon, items, formatName, colorClass, headerBg, highlightCard, opacityCard, pulseBadge 
+}: { 
+    title: string, icon: any, items: Transaction[], formatName: any, colorClass: string, headerBg: string, highlightCard?: boolean, opacityCard?: boolean, pulseBadge?: boolean
+}) {
     return (
-        <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+        <div className={`rounded-3xl border flex flex-col overflow-hidden shadow-sm ${colorClass}`}>
+            <div className={`px-5 py-4 ${headerBg} flex items-center justify-between border-b border-black/5`}>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                    {icon} {title}
+                </h2>
+                <span className="font-bold bg-white/50 px-3 py-1 rounded-full text-sm">
+                    {items.length}
+                </span>
+            </div>
+            
+            <div className="p-4 space-y-4 flex-1 overflow-y-auto scrollbar-hide max-h-[65vh]">
+                <AnimatePresence mode="popLayout">
+                    {items.map((item) => (
+                        <motion.div
+                            key={item.id}
+                            layout
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className={`p-5 rounded-2xl border flex flex-col gap-2 
+                                ${highlightCard ? 'bg-white border-emerald-300 shadow-md ring-1 ring-emerald-100' : 'bg-white border-slate-200 shadow-sm'} 
+                                ${opacityCard ? 'opacity-70 grayscale-[20%]' : ''}`
+                            }
+                        >
+                            <div className="flex justify-between items-start">
+                                <span className={`text-xl font-bold tracking-tight ${highlightCard ? 'text-emerald-900' : 'text-slate-800'}`}>
+                                    {formatName(item.customer?.name)}
+                                </span>
+                                {pulseBadge && (
+                                    <span className="flex h-3 w-3 relative mt-1.5 align-top">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                    </span>
+                                )}
+                                {item.status === 'cancelled' && (
+                                    <XCircle className="h-5 w-5 text-red-500" />
+                                )}
+                            </div>
+                            
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="font-mono text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">
+                                    {item.invoice_code}
+                                </span>
+                                <span className="text-slate-400 font-medium tracking-tight">
+                                    {item.time}
+                                </span>
+                            </div>
+                        </motion.div>
+                    ))}
+                    {items.length === 0 && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-slate-400 py-10 font-medium">
+                            Kosong
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
     );
 }
