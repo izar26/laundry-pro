@@ -23,10 +23,6 @@ class QueueController extends Controller
         };
 
         $transactions = Transaction::whereIn('status', ['pending', 'new', 'process', 'ready'])
-            ->orWhere(function ($query) {
-                $query->whereIn('status', ['done', 'cancelled'])
-                      ->whereDate('updated_at', \Carbon\Carbon::today());
-            })
             ->with(['customer.user'])
             ->orderBy('updated_at', 'desc')
             ->get()
@@ -39,8 +35,6 @@ class QueueController extends Controller
                 'new' => $transactions->get('new', []),
                 'process' => $transactions->get('process', []),
                 'ready' => $transactions->get('ready', []),
-                'done' => $transactions->get('done', []),
-                'cancelled' => $transactions->get('cancelled', []),
             ]
         ]);
     }

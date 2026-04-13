@@ -48,11 +48,8 @@ export default function QueueIndex({ queue }: QueueProps) {
     const newO = safeQueue.new || [];
     const processOrders = safeQueue.process || [];
     const readyOrders = safeQueue.ready || [];
-    const doneOrders = safeQueue.done || [];
-    const cancelledOrders = safeQueue.cancelled || [];
 
     const newOrders = [...pendingOrders, ...newO];
-    const completedOrders = [...doneOrders, ...cancelledOrders];
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 p-8 flex flex-col font-sans overflow-hidden">
@@ -79,8 +76,8 @@ export default function QueueIndex({ queue }: QueueProps) {
                 </div>
             </div>
 
-            {/* Grid 4 Kolom Status */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Grid 3 Kolom Status */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* Kolom BARU */}
                 <QueueColumn 
@@ -112,17 +109,6 @@ export default function QueueIndex({ queue }: QueueProps) {
                     items={readyOrders}
                     formatName={formatName}
                     highlightCard
-                />
-
-                {/* Kolom SELESAI */}
-                <QueueColumn 
-                    title="Selesai / Batal" 
-                    icon={<Check className="h-6 w-6 text-slate-500" />} 
-                    colorClass="border-slate-200 bg-white"
-                    headerBg="bg-gray-100 text-gray-700"
-                    items={completedOrders}
-                    formatName={formatName}
-                    opacityCard
                 />
 
             </div>
