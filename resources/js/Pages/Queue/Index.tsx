@@ -6,7 +6,7 @@ import { Shirt, CheckCircle2, Clock } from 'lucide-react';
 type Transaction = {
     id: number;
     invoice_code: string;
-    customer: { name: string };
+    customer: { name: string } | null;
 };
 
 export default function QueueIndex({ processing, ready }: { processing: Transaction[], ready: Transaction[] }) {
@@ -20,7 +20,8 @@ export default function QueueIndex({ processing, ready }: { processing: Transact
     }, []);
 
     // Format nama agar privasi terjaga (Budi Santoso -> Budi S.)
-    const formatName = (name: string) => {
+    const formatName = (name?: string | null) => {
+        if (!name) return 'Pelanggan';
         const parts = name.split(' ');
         if (parts.length > 1) {
             return `${parts[0]} ${parts[1][0]}.`;
@@ -75,7 +76,7 @@ export default function QueueIndex({ processing, ready }: { processing: Transact
                                     className="bg-slate-800 rounded-2xl p-6 flex justify-between items-center shadow-lg border border-slate-700/50"
                                 >
                                     <div>
-                                        <span className="text-2xl font-bold block">{formatName(item.customer.name)}</span>
+                                        <span className="text-2xl font-bold block">{formatName(item.customer?.name)}</span>
                                         <span className="text-slate-500 font-mono text-lg">{item.invoice_code}</span>
                                     </div>
                                     <div className="h-4 w-4 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_#3b82f6]"></div>
@@ -109,7 +110,7 @@ export default function QueueIndex({ processing, ready }: { processing: Transact
                                     className="bg-emerald-900/20 rounded-2xl p-6 flex justify-between items-center shadow-lg border border-emerald-500/30"
                                 >
                                     <div>
-                                        <span className="text-3xl font-black block text-emerald-100">{formatName(item.customer.name)}</span>
+                                        <span className="text-3xl font-black block text-emerald-100">{formatName(item.customer?.name)}</span>
                                         <span className="text-emerald-400/70 font-mono text-lg">{item.invoice_code}</span>
                                     </div>
                                     <div className="bg-emerald-500 text-slate-950 px-4 py-1 rounded-full font-bold text-sm">READY</div>
