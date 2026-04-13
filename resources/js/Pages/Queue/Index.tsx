@@ -12,13 +12,13 @@ type Transaction = {
 };
 
 type QueueProps = {
-    queue: {
-        pending: Transaction[];
-        new: Transaction[];
-        process: Transaction[];
-        ready: Transaction[];
-        done: Transaction[];
-        cancelled: Transaction[];
+    queue?: {
+        pending?: Transaction[];
+        new?: Transaction[];
+        process?: Transaction[];
+        ready?: Transaction[];
+        done?: Transaction[];
+        cancelled?: Transaction[];
     }
 };
 
@@ -42,8 +42,17 @@ export default function QueueIndex({ queue }: QueueProps) {
         return name;
     };
 
-    const newOrders = [...queue.pending, ...queue.new];
-    const completedOrders = [...queue.done, ...queue.cancelled];
+    // Aman dari undefined
+    const safeQueue = queue || {};
+    const pendingOrders = safeQueue.pending || [];
+    const newO = safeQueue.new || [];
+    const processOrders = safeQueue.process || [];
+    const readyOrders = safeQueue.ready || [];
+    const doneOrders = safeQueue.done || [];
+    const cancelledOrders = safeQueue.cancelled || [];
+
+    const newOrders = [...pendingOrders, ...newO];
+    const completedOrders = [...doneOrders, ...cancelledOrders];
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 p-8 flex flex-col font-sans overflow-hidden">
@@ -89,7 +98,7 @@ export default function QueueIndex({ queue }: QueueProps) {
                     icon={<PlayCircle className="h-6 w-6 text-blue-500" />} 
                     colorClass="border-blue-200 bg-blue-50/50"
                     headerBg="bg-blue-100 text-blue-800"
-                    items={queue.process}
+                    items={processOrders}
                     formatName={formatName}
                     pulseBadge
                 />
@@ -100,7 +109,7 @@ export default function QueueIndex({ queue }: QueueProps) {
                     icon={<CheckCircle2 className="h-6 w-6 text-emerald-600" />} 
                     colorClass="border-emerald-200 bg-emerald-50/50 shadow-sm"
                     headerBg="bg-emerald-100 text-emerald-800"
-                    items={queue.ready}
+                    items={readyOrders}
                     formatName={formatName}
                     highlightCard
                 />
