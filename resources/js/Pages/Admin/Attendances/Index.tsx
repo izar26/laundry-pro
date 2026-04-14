@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FileDown, Calendar as CalendarIcon, FilterX, Clock, AlertTriangle, CheckCircle, CopyX } from 'lucide-react';
 import { Badge } from '@/Components/ui/badge';
@@ -13,6 +13,9 @@ import axios from 'axios';
 import { toast } from 'sonner';
 
 export default function Index({ attendances: initialAttendances, employees, filters }: any) {
+    const { auth } = usePage().props as any;
+    const isOwner = auth.user.roles?.includes('owner');
+
     const [attendances, setAttendances] = useState(initialAttendances);
     const [isLoading, setIsLoading] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -293,12 +296,14 @@ export default function Index({ attendances: initialAttendances, employees, filt
                                                 </td>
                                                 <td className="px-6 py-3 border-l border-gray-50">
                                                     <select 
+                                                        disabled={isOwner}
                                                         className={cn(
                                                             "h-8 rounded-lg border text-xs font-bold px-2 py-1 focus:ring-2 focus:ring-primary outline-none transition-all",
                                                             att.status === 'present' ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
                                                             att.status === 'late' ? "border-orange-200 text-orange-700 bg-orange-50" :
                                                             att.status === 'alfa' ? "border-red-200 text-red-700 bg-red-50" :
-                                                            "border-blue-200 text-blue-700 bg-blue-50"
+                                                            "border-blue-200 text-blue-700 bg-blue-50",
+                                                            isOwner && "opacity-50 cursor-not-allowed"
                                                         )}
                                                         value={att.status}
                                                         onChange={(e) => updateStatus(att.employee_id, att.date, e.target.value)}

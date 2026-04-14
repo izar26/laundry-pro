@@ -49,36 +49,47 @@ class TransactionController extends Controller
             }
         }
 
-        // 1. Data Statistik (Selalu ada)
+        $user = $request->user();
+
+        // Helper: Terapkan filter hak akses berdasarkan role
+        $applyRoleScope = function ($query) use ($user) {
+            if ($user->hasRole('pelanggan')) {
+                // Pelanggan hanya melihat transaksi miliknya sendiri
+                $query->whereHas('customer', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            } elseif ($user->hasRole('pegawai')) {
+                // Pegawai hanya melihat transaksi yang dibuat oleh dirinya
+                $query->where('user_id', $user->id);
+            }
+            // Admin & Owner bisa melihat semua transaksi
+        };
+
+        // 1. Data Statistik (Di-scope per role)
+        $statsBaseQuery = fn() => Transaction::query()->tap($applyRoleScope);
         $stats = [
-            'revenue_today' => Transaction::whereDate('created_at', today())->where('payment_status', 'paid')->sum('final_amount'),
-            'trx_today' => Transaction::whereDate('created_at', today())->count(),
-            'unpaid_count' => Transaction::where('payment_status', 'unpaid')->count(),
-            'process_count' => Transaction::whereIn('status', ['new', 'process'])->count(),
+            'revenue_today' => $statsBaseQuery()->whereDate('created_at', today())->where('payment_status', 'paid')->sum('final_amount'),
+            'trx_today' => $statsBaseQuery()->whereDate('created_at', today())->count(),
+            'unpaid_count' => $statsBaseQuery()->where('payment_status', 'unpaid')->count(),
+            'process_count' => $statsBaseQuery()->whereIn('status', ['new', 'process'])->count(),
         ];
 
         // 2. Jika Mode Kanban (Board), ambil data active only tapi lengkap
         if ($request->get('view') === 'board') {
-            $query = Transaction::with('customer.user') // Eager load minimal
+            $query = Transaction::with('customer.user')
                 ->select('id', 'invoice_code', 'customer_id', 'user_id', 'total_amount', 'final_amount', 'payment_status', 'status', 'created_at')
-                ->whereIn('status', ['pending', 'new', 'process', 'ready', 'done', 'cancelled']) // Ambil semua status
-                ->whereDate('created_at', '>=', now()->subDays(30)) // Batasi 30 hari terakhir agar tidak berat
+                ->whereIn('status', ['pending', 'new', 'process', 'ready', 'done', 'cancelled'])
+                ->whereDate('created_at', '>=', now()->subDays(30))
                 ->orderBy('created_at', 'desc');
 
-            // Filter Hak Akses untuk Kanban
-            $user = $request->user();
-            if ($user->hasRole('pelanggan')) {
-                $query->whereHas('customer', function($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
-            }
-            // Pegawai lihat semua (hapus filter user_id)
+            // Terapkan filter hak akses
+            $applyRoleScope($query);
 
             $kanbanData = $query->get();
             
             return Inertia::render('Admin/Transactions/Index', [
                 'transactions' => ['data' => []], // Dummy pagination object
-                'kanbanData' => $kanbanData, // Kirim data khusus kanban
+                'kanbanData' => $kanbanData,
                 'filters' => $request->only(['search', 'status', 'view']),
                 'stats' => $stats,
             ]);
@@ -86,16 +97,8 @@ class TransactionController extends Controller
 
         $query = Transaction::with(['customer.user', 'user']);
 
-        // Filter Hak Akses
-        $user = $request->user();
-        
-        // Pelanggan hanya bisa melihat transaksinya sendiri
-        if ($user->hasRole('pelanggan')) {
-            $query->whereHas('customer', function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-        }
-        // Pegawai, Admin, Owner bisa melihat SEMUA transaksi (tidak ada filter user_id lagi)
+        // Terapkan filter hak akses
+        $applyRoleScope($query);
 
         if ($request->has('status') && $request->status !== 'all') {
             if ($request->status === 'unpaid') {
@@ -105,11 +108,15 @@ class TransactionController extends Controller
             }
         }
 
+        // Search — dibungkus dalam closure agar tidak mem-bypass filter role
         if ($request->has('search')) {
-            $query->where('invoice_code', 'like', "%{$request->search}%")
-                  ->orWhereHas('customer.user', function($q) use ($request) {
-                      $q->where('name', 'like', "%{$request->search}%");
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_code', 'like', "%{$search}%")
+                  ->orWhereHas('customer.user', function($sub) use ($search) {
+                      $sub->where('name', 'like', "%{$search}%");
                   });
+            });
         }
 
         $transactions = $query->latest()->paginate(10)->withQueryString();

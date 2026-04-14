@@ -56,7 +56,7 @@ export function AdminSidebar({ isCollapsed, toggleCollapse }: AdminSidebarProps)
         // Tampilkan menu Pelanggan hanya untuk Admin/Owner/Pegawai
         ...((isAdminOrOwner || isPegawai) ? managementItems : []),
         ...catalogItems, // Layanan & Diskon tampil untuk semua (termasuk Pelanggan)
-        ...(isAdminOrOwner ? adminItems : []),
+        ...(isAdminOrOwner ? adminItems.filter(item => !(userRoles.includes('owner') && item.name === 'Scan Absen')) : []),
     ];
 
     const logoUrl = app_settings.app_logo ? `/storage/${app_settings.app_logo}` : null;

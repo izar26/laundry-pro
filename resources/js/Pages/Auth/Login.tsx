@@ -5,7 +5,7 @@ import { Checkbox } from '@/Components/ui/checkbox';
 import InputError from '@/Components/InputError';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
-import { Loader2, Command } from 'lucide-react';
+import { Loader2, Command, MonitorPlay } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/Components/BackgroundParticles';
 
@@ -154,14 +154,34 @@ export default function Login({
                             Masuk Sekarang
                         </Button>
 
-                        <div className="mt-4 text-center text-sm">
-                            <span className="text-muted-foreground">Belum punya akun? </span>
-                            <Link
-                                href={route('register')}
-                                className="font-medium text-primary hover:text-primary/80 hover:underline"
-                            >
-                                Daftar sebagai pelanggan
-                            </Link>
+                        <div className="mt-4 flex flex-col space-y-4 text-center text-sm">
+                            <div>
+                                <span className="text-muted-foreground">Belum punya akun? </span>
+                                <Link
+                                    href={route('register')}
+                                    className="font-medium text-primary hover:text-primary/80 hover:underline"
+                                >
+                                    Daftar sebagai pelanggan
+                                </Link>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-zinc-50/50 dark:bg-zinc-900/50 px-2 text-muted-foreground">
+                                        Atau Akses Publik
+                                    </span>
+                                </div>
+                            </div>
+
+                            <Button asChild variant="outline" className="w-full h-11 border-dashed bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                                <Link href={route('queue.index')}>
+                                    <MonitorPlay className="mr-2 h-4 w-4 text-primary" />
+                                    Lihat Layar Antrian Terkini
+                                </Link>
+                            </Button>
                         </div>
                     </form>
                 </motion.div>

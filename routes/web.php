@@ -89,6 +89,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
     });
 
+    Route::group(['middleware' => ['role:admin|owner']], function () {
+        Route::get('/attendances/report', [\App\Http\Controllers\Admin\AttendanceController::class, 'index'])->name('attendances.index');
+        Route::get('/attendances/export', [\App\Http\Controllers\Admin\AttendanceController::class, 'export'])->name('attendances.export');
+    });
+
     // --- Rute KHUSUS ADMIN ---
     Route::group(['middleware' => ['role:admin']], function () {
         // Manajemen Pegawai (Create/Edit/Delete) - Index sudah di atas
@@ -107,12 +112,10 @@ Route::middleware('auth')->group(function () {
         // Settings (Update)
         Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
         
-        // Attendances
+        // Attendances (Write)
         Route::get('/attendances/scanner', [\App\Http\Controllers\Admin\AttendanceController::class, 'scanner'])->name('attendances.scanner');
         Route::post('/attendances/record', [\App\Http\Controllers\Admin\AttendanceController::class, 'record'])->name('attendances.record');
-        Route::get('/attendances/report', [\App\Http\Controllers\Admin\AttendanceController::class, 'index'])->name('attendances.index');
         Route::post('/attendances/update-status', [\App\Http\Controllers\Admin\AttendanceController::class, 'updateStatus'])->name('attendances.update-status');
-        Route::get('/attendances/export', [\App\Http\Controllers\Admin\AttendanceController::class, 'export'])->name('attendances.export');
     });
 });
 
