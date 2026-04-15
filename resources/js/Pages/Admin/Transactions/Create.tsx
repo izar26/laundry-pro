@@ -41,7 +41,12 @@ import {
     ArrowLeft,
     Keyboard,
     Mic,
-    MicOff
+    MicOff,
+    Tag,
+    Info,
+    Sparkles,
+    X,
+    TicketPercent
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
@@ -57,12 +62,17 @@ type Customer = { id: number; name: string; phone: string };
 type Service = { id: number; name: string; price: string; unit: string; description: string };
 type Promotion = { 
     id: number; 
-    code: string; 
+    name: string;
+    code: string | null; 
     type: string; 
     value: string; 
-    min_weight?: string; 
-    min_amount?: string;
-    service_id?: number;
+    min_weight?: string | null; 
+    min_amount?: string | null;
+    service_id?: number | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    is_active?: boolean;
+    description?: string | null;
 };
 
 type CartItem = {
@@ -71,6 +81,25 @@ type CartItem = {
     price: number;
     unit: string;
     qty: number;
+};
+
+type AppliedPromoInfo = {
+    promo: Promotion;
+    amount: number;
+    label: string; // e.g. "10%" or "Rp5.000"
+    isCode: boolean; // apakah dari kode voucher
+};
+
+type IneligiblePromoInfo = {
+    promo: Promotion;
+    reason: string;
+    progress?: number; // 0-100, progress menuju eligible
+};
+
+type DiscountInfo = {
+    totalDiscount: number;
+    applied: AppliedPromoInfo[];
+    ineligible: IneligiblePromoInfo[];
 };
 
 declare global {
@@ -253,58 +282,180 @@ function TransactionCreate({ customers, services, promotions }: {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
     const totalWeightKg = cart.filter(item => item.unit === 'kg').reduce((acc, item) => acc + item.qty, 0);
 
-    const discount = useMemo(() => {
-        let disc = 0;
-        const checkEligibility = (p: Promotion) => {
-            if (p.min_amount && subtotal < parseFloat(p.min_amount)) return false;
-            if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) return false;
-            return true;
-        };
+    // Helper format rupiah (dipindah ke atas agar bisa dipakai di discountInfo)
+    const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
-        const calculatePromoValue = (p: Promotion) => {
-            if (!checkEligibility(p)) return 0;
-            
+    const discountInfo: DiscountInfo = useMemo(() => {
+        const applied: AppliedPromoInfo[] = [];
+        const ineligible: IneligiblePromoInfo[] = [];
+        let totalDiscount = 0;
+        const processedIds = new Set<number>(); // Anti double-apply
+
+        const processPromo = (p: Promotion, isCode: boolean) => {
+            if (processedIds.has(p.id)) return; // Sudah diproses (anti double)
+
+            // Cek min_amount
+            if (p.min_amount && subtotal < parseFloat(p.min_amount)) {
+                const needed = parseFloat(p.min_amount);
+                const progress = Math.min(100, Math.round((subtotal / needed) * 100));
+                ineligible.push({ 
+                    promo: p, 
+                    reason: `Min. transaksi ${formatRupiah(needed)} (kurang ${formatRupiah(needed - subtotal)})`,
+                    progress 
+                });
+                return;
+            }
+
+            // Cek min_weight
+            if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) {
+                const needed = parseFloat(p.min_weight);
+                const progress = Math.min(100, Math.round((totalWeightKg / needed) * 100));
+                ineligible.push({ 
+                    promo: p, 
+                    reason: `Min. berat ${needed}kg (kurang ${(needed - totalWeightKg).toFixed(1)}kg)`,
+                    progress 
+                });
+                return;
+            }
+
+            // Cek service_id — apakah layanan target ada di cart
             let baseVal = subtotal;
             if (p.service_id) {
                 const targetItems = cart.filter(i => i.serviceId === p.service_id);
-                if (targetItems.length === 0) return 0;
+                if (targetItems.length === 0) {
+                    // Cari nama layanan dari services prop
+                    const svc = services.find(s => s.id === p.service_id);
+                    ineligible.push({ 
+                        promo: p, 
+                        reason: `Khusus layanan "${svc?.name || 'tertentu'}" — belum ada di keranjang` 
+                    });
+                    return;
+                }
                 baseVal = targetItems.reduce((acc, i) => acc + (i.price * i.qty), 0);
             }
-            return p.type === 'percentage' ? baseVal * (parseFloat(p.value) / 100) : parseFloat(p.value);
+
+            // Hitung diskon
+            const amount = p.type === 'percentage' 
+                ? baseVal * (parseFloat(p.value) / 100) 
+                : Math.min(parseFloat(p.value), baseVal);
+
+            if (amount > 0) {
+                const label = p.type === 'percentage' 
+                    ? `${parseFloat(p.value)}%` 
+                    : formatRupiah(parseFloat(p.value));
+                applied.push({ promo: p, amount, label, isCode });
+                totalDiscount += amount;
+                processedIds.add(p.id);
+            }
         };
 
-        if (appliedPromo) disc += calculatePromoValue(appliedPromo);
+        // 1. Apply promo kode (manual) dulu
+        if (appliedPromo) processPromo(appliedPromo, true);
         
-        promotions.filter(p => !p.code).forEach(p => {
-            disc += calculatePromoValue(p);
-        });
+        // 2. Apply auto promos (tanpa kode)
+        promotions.filter(p => !p.code).forEach(p => processPromo(p, false));
         
-        return Math.min(disc, subtotal);
-    }, [cart, appliedPromo, subtotal, totalWeightKg, promotions]);
+        totalDiscount = Math.min(totalDiscount, subtotal);
+        return { totalDiscount, applied, ineligible };
+    }, [cart, appliedPromo, subtotal, totalWeightKg, promotions, services]);
 
+    const discount = discountInfo.totalDiscount;
     const total = subtotal - discount;
+
+    // Auto re-validate promo kode saat cart berubah
+    useEffect(() => {
+        if (!appliedPromo) return;
+        
+        // Cek apakah promo kode masih eligible
+        const p = appliedPromo;
+        let stillEligible = true;
+        let reason = '';
+
+        if (p.min_amount && subtotal < parseFloat(p.min_amount)) {
+            stillEligible = false;
+            reason = `Subtotal di bawah minimum ${formatRupiah(parseFloat(p.min_amount))}`;
+        } else if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) {
+            stillEligible = false;
+            reason = `Berat di bawah minimum ${p.min_weight}kg`;
+        } else if (p.service_id) {
+            const hasTarget = cart.some(i => i.serviceId === p.service_id);
+            if (!hasTarget) {
+                stillEligible = false;
+                reason = 'Layanan terkait dihapus dari keranjang';
+            }
+        }
+
+        if (!stillEligible && cart.length > 0) {
+            toast.warning(`Promo "${p.name}" dicabut: ${reason}`, { duration: 4000 });
+            setAppliedPromo(null);
+            setPromoCode('');
+        }
+    }, [cart, subtotal, totalWeightKg]);
 
     const applyPromoCode = () => {
         if (!promoCode) {
             setAppliedPromo(null);
             return;
         }
-        const promo = promotions.find(p => p.code === promoCode.toUpperCase());
-        if (promo) { 
-            let eligible = true;
-            let reason = "";
-            if (promo.min_amount && subtotal < parseFloat(promo.min_amount)) { eligible = false; reason = "Min. transaksi " + formatRupiah(parseFloat(promo.min_amount)); }
-            else if (promo.min_weight && totalWeightKg < parseFloat(promo.min_weight)) { eligible = false; reason = "Min. berat " + promo.min_weight + "kg"; }
-            
-            if (!eligible) {
-                toast.error("Belum memenuhi syarat: " + reason);
-                setAppliedPromo(null);
-            } else {
-                setAppliedPromo(promo); 
-                toast.success("Promo berhasil diterapkan!"); 
+        const code = promoCode.trim().toUpperCase();
+        const promo = promotions.find(p => p.code === code);
+        
+        if (!promo) {
+            toast.error('Kode promo tidak ditemukan!', { description: `"${code}" bukan kode promo yang valid.` });
+            setAppliedPromo(null);
+            return;
+        }
+
+        // Validasi kelengkapan
+        const errors: string[] = [];
+
+        if (promo.min_amount && subtotal < parseFloat(promo.min_amount)) {
+            errors.push(`Min. transaksi ${formatRupiah(parseFloat(promo.min_amount))} (saat ini ${formatRupiah(subtotal)})`);
+        }
+        if (promo.min_weight && totalWeightKg < parseFloat(promo.min_weight)) {
+            errors.push(`Min. berat ${promo.min_weight}kg (saat ini ${totalWeightKg}kg)`);
+        }
+        if (promo.service_id) {
+            const hasTarget = cart.some(i => i.serviceId === promo.service_id);
+            if (!hasTarget) {
+                const svc = services.find(s => s.id === promo.service_id);
+                errors.push(`Khusus layanan "${svc?.name || 'tertentu'}" — tambahkan ke keranjang dulu`);
             }
         }
-        else { toast.error("Kode promo tidak ditemukan!"); setAppliedPromo(null); }
+        if (cart.length === 0) {
+            errors.push('Keranjang masih kosong');
+        }
+
+        if (errors.length > 0) {
+            toast.error('Promo belum bisa dipakai', { 
+                description: errors.join('. '),
+                duration: 5000 
+            });
+            setAppliedPromo(null);
+            return;
+        }
+
+        // Hitung preview diskon
+        let baseVal = subtotal;
+        if (promo.service_id) {
+            baseVal = cart.filter(i => i.serviceId === promo.service_id).reduce((a, i) => a + i.price * i.qty, 0);
+        }
+        const previewDiscount = promo.type === 'percentage' 
+            ? baseVal * (parseFloat(promo.value) / 100) 
+            : Math.min(parseFloat(promo.value), baseVal);
+
+        setAppliedPromo(promo);
+        toast.success(`Promo "${promo.name}" diterapkan!`, {
+            description: `Hemat ${formatRupiah(previewDiscount)}`,
+            duration: 3000
+        });
+    };
+
+    const removePromoCode = () => {
+        const name = appliedPromo?.name || 'Promo';
+        setAppliedPromo(null);
+        setPromoCode('');
+        toast.info(`Promo "${name}" dihapus.`);
     };
 
     const handleCheckout = async () => {
@@ -326,8 +477,6 @@ function TransactionCreate({ customers, services, promotions }: {
         } catch (e: any) { toast.error("Error: " + (e.response?.data?.message || "Gagal")); }
         finally { setIsProcessing(false); }
     };
-
-    const formatRupiah = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
     return (
         <>
@@ -417,18 +566,109 @@ function TransactionCreate({ customers, services, promotions }: {
                         {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} />)}
                     </div>
 
-                    <div className="p-4 border-t bg-background">
-                        <div className="flex gap-2 mb-4">
-                            <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-8 text-xs uppercase" />
-                            <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={applyPromoCode}>Pakai</Button>
-                        </div>
-                        <div className="space-y-2 text-sm mb-4">
+                    <div className="p-4 border-t bg-background space-y-3">
+                        {/* Input Kode Promo */}
+                        {appliedPromo ? (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
+                            >
+                                <TicketPercent className="h-4 w-4 text-emerald-600 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate">{appliedPromo.name}</div>
+                                    <div className="text-[10px] text-emerald-600/70 dark:text-emerald-500/70 font-mono">{appliedPromo.code}</div>
+                                </div>
+                                <button onClick={removePromoCode} className="p-1 hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 rounded transition-colors">
+                                    <X className="h-3.5 w-3.5 text-emerald-600" />
+                                </button>
+                            </motion.div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-8 text-xs uppercase font-mono" />
+                                <Button variant="secondary" size="sm" className="h-8 text-xs shrink-0" onClick={applyPromoCode} disabled={!promoCode.trim()}>Pakai</Button>
+                            </div>
+                        )}
+
+                        {/* Breakdown Diskon */}
+                        <div className="space-y-1.5 text-sm">
                             <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
-                            {discount > 0 && <div className="flex justify-between text-emerald-600 font-bold"><span>Diskon</span><span>-{formatRupiah(discount)}</span></div>}
+                            
+                            {/* Promo yang terapply — breakdown per item */}
+                            <AnimatePresence>
+                                {discountInfo.applied.map((info, idx) => (
+                                    <motion.div 
+                                        key={`applied-${info.promo.id}`}
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                            <span className="flex items-center gap-1.5 text-xs">
+                                                {info.isCode ? <Tag className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                                                <span className="truncate max-w-[140px]" title={info.promo.name}>{info.promo.name}</span>
+                                                <Badge variant="outline" className="text-[9px] py-0 h-4 border-emerald-300 dark:border-emerald-700 text-emerald-600">{info.label}</Badge>
+                                            </span>
+                                            <span className="font-bold text-xs">-{formatRupiah(info.amount)}</span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+                            {/* Total diskon summary jika ada > 1 promo */}
+                            {discountInfo.applied.length > 1 && (
+                                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-bold text-xs pt-0.5 border-t border-dashed border-emerald-200 dark:border-emerald-800">
+                                    <span>Total Diskon</span>
+                                    <span>-{formatRupiah(discount)}</span>
+                                </div>
+                            )}
+
                             <Separator />
                             <div className="flex justify-between text-xl font-bold pt-1"><span>Total</span><span className="text-primary"><RollingNumber value={total} /></span></div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 mb-4">
+
+                        {/* Hints: Promo yang belum memenuhi syarat */}
+                        <AnimatePresence>
+                            {cart.length > 0 && discountInfo.ineligible.length > 0 && (
+                                <motion.div 
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-lg p-2.5 space-y-2">
+                                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                                            <Info className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wide">Promo Hampir Tercapai</span>
+                                        </div>
+                                        {discountInfo.ineligible.map((info) => (
+                                            <div key={`hint-${info.promo.id}`} className="space-y-1">
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300 truncate max-w-[180px]" title={info.promo.name}>{info.promo.name}</span>
+                                                    <span className="text-[10px] text-amber-600 dark:text-amber-500">
+                                                        {info.promo.type === 'percentage' ? `${parseFloat(info.promo.value)}%` : formatRupiah(parseFloat(info.promo.value))}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] text-amber-600/80 dark:text-amber-500/80">{info.reason}</div>
+                                                {info.progress !== undefined && (
+                                                    <div className="w-full bg-amber-200/50 dark:bg-amber-900/30 rounded-full h-1">
+                                                        <motion.div 
+                                                            className="bg-amber-500 dark:bg-amber-400 h-1 rounded-full"
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${info.progress}%` }}
+                                                            transition={{ duration: 0.5, ease: 'easeOut' }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Payment Method */}
+                        <div className="grid grid-cols-2 gap-2">
                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-2 gap-1"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
                             <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans (Online)</span></Button>
                         </div>

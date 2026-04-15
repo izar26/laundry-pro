@@ -152,7 +152,7 @@ class TransactionController extends Controller
                                    ->where(function($q) {
                                        $q->whereNull('end_date')
                                          ->orWhere('end_date', '>=', now()->toDateString());
-                                   })->get(),
+                                   })->get(), // Sudah termasuk semua kolom: name, code, service_id, start_date, end_date, dll
         ]);
     }
 
@@ -207,6 +207,7 @@ class TransactionController extends Controller
             // Diskon logic
             $discountAmount = 0;
             $promosToCheck = [];
+            $processedPromoIds = []; // Anti double-apply
 
             if ($request->filled('promo_code')) {
                 $codePromo = Promotion::where('code', $request->promo_code)
@@ -220,6 +221,14 @@ class TransactionController extends Controller
                     ->first();
                 
                 if ($codePromo) {
+                    // Validasi service_id: jika promo khusus layanan tertentu, pastikan ada di cart
+                    if ($codePromo->service_id) {
+                        $hasTargetService = $cartCollection->where('service_id', $codePromo->service_id)->isNotEmpty();
+                        if (!$hasTargetService) {
+                            $serviceName = Service::find($codePromo->service_id)->name ?? 'tertentu';
+                            throw new \Exception("Promo ini khusus untuk layanan \"{$serviceName}\" yang belum ada di keranjang.");
+                        }
+                    }
                     $promosToCheck[] = $codePromo;
                 } else {
                     throw new \Exception("Kode promo tidak valid, sudah kedaluwarsa, atau tidak aktif.");
@@ -240,6 +249,9 @@ class TransactionController extends Controller
             $totalWeightKg = $cartCollection->where('unit', 'kg')->sum('qty');
 
             foreach ($promosToCheck as $promo) {
+                // Anti double-apply: skip jika promo ini sudah diproses
+                if (in_array($promo->id, $processedPromoIds)) continue;
+
                 $eligible = true;
                 if ($promo->min_amount && $totalAmount < $promo->min_amount) $eligible = false;
                 if ($promo->min_weight && $totalWeightKg < $promo->min_weight) $eligible = false;
@@ -256,9 +268,10 @@ class TransactionController extends Controller
                     if ($promo->type === 'percentage') {
                         $promoVal = $baseCalculation * ($promo->value / 100);
                     } else {
-                        $promoVal = $promo->value;
+                        $promoVal = min($promo->value, $baseCalculation); // Cap fixed discount ke base value
                     }
                     $discountAmount += $promoVal;
+                    $processedPromoIds[] = $promo->id; // Tandai sudah diproses
                 }
             }
 
