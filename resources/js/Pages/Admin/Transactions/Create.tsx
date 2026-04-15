@@ -122,7 +122,7 @@ function RollingNumber({ value }: { value: number }) {
     );
 }
 
-function CartItemRow({ item, updateQty, removeItem }: { item: CartItem, updateQty: (id: number, delta: number) => void, removeItem: (id: number) => void }) {
+function CartItemRow({ item, updateQty, removeItem, formatRupiah }: { item: CartItem, updateQty: (id: number, delta: number) => void, removeItem: (id: number) => void, formatRupiah: (val: number) => string }) {
     const x = useMotionValue(0);
     const opacity = useTransform(x, [-100, 0], [0, 1]);
 
@@ -149,28 +149,42 @@ function CartItemRow({ item, updateQty, removeItem }: { item: CartItem, updateQt
                 LEPAS UNTUK HAPUS <Trash className="ml-1 h-4 w-4" />
             </motion.div>
 
-            <div className="flex items-center justify-between bg-background p-3 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800 relative z-10">
-                <div className="flex-1 mr-2">
-                    <div className="font-medium text-sm line-clamp-1" title={item.name}>{item.name}</div>
-                    <div className="text-xs text-muted-foreground">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price)} / {item.unit}</div>
+            <div className="bg-background p-3.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 relative z-10">
+                {/* Row 1: Nama + Hapus */}
+                <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 mr-2">
+                        <div className="font-semibold text-[13px] leading-snug line-clamp-2" title={item.name}>{item.name}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{formatRupiah(item.price)} / {item.unit}</div>
+                    </div>
+                    <button 
+                        onClick={() => removeItem(item.serviceId)} 
+                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                    >
+                        <Trash className="h-3.5 w-3.5" />
+                    </button>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-muted rounded-md h-8 shadow-inner">
-                        <button onClick={() => updateQty(item.serviceId, -0.5)} className="w-8 h-full flex items-center justify-center hover:bg-background rounded-l-md transition-colors text-muted-foreground hover:text-foreground active:scale-90"><Minus className="h-3 w-3" /></button>
+                {/* Row 2: Qty controls + Subtotal */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center bg-muted rounded-lg h-9 shadow-inner">
+                        <button onClick={() => updateQty(item.serviceId, -0.5)} className="w-9 h-full flex items-center justify-center hover:bg-background rounded-l-lg transition-colors text-muted-foreground hover:text-foreground active:scale-90">
+                            <Minus className="h-3.5 w-3.5" />
+                        </button>
                         <motion.span 
                             key={item.qty}
-                            initial={{ scale: 1.2 }}
+                            initial={{ scale: 1.3 }}
                             animate={{ scale: 1 }}
-                            className="text-sm font-mono w-8 text-center"
+                            className="text-sm font-bold font-mono w-10 text-center"
                         >
                             {item.qty}
                         </motion.span>
-                        <button onClick={() => updateQty(item.serviceId, 0.5)} className="w-8 h-full flex items-center justify-center hover:bg-background rounded-r-md transition-colors text-muted-foreground hover:text-foreground active:scale-90"><Plus className="h-3 w-3" /></button>
+                        <button onClick={() => updateQty(item.serviceId, 0.5)} className="w-9 h-full flex items-center justify-center hover:bg-background rounded-r-lg transition-colors text-muted-foreground hover:text-foreground active:scale-90">
+                            <Plus className="h-3.5 w-3.5" />
+                        </button>
                     </div>
-                </div>
-                <div className="text-right min-w-[70px] ml-2">
-                    <div className="font-semibold text-sm">
-                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price * item.qty)}
+                    <div className="text-right">
+                        <div className="font-bold text-sm text-foreground">
+                            {formatRupiah(item.price * item.qty)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -508,47 +522,26 @@ function TransactionCreate({ customers, services, promotions }: {
                     </div>
 
                     <div className="flex-1 overflow-y-auto pr-2 pb-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <AnimatePresence>
-                                {filteredServices.map(service => {
-                                    const inCart = cart.find(c => c.serviceId === service.id);
-                                    return (
-                                        <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={service.id}>
-                                            <SpotlightCard className={cn(
-                                                "cursor-pointer transition-all group",
-                                                inCart ? "border-primary/50 bg-primary/[0.02] dark:bg-primary/[0.05]" : "hover:border-primary/40"
-                                            )}>
-                                                <div onClick={() => addToCart(service)} className="p-4">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <h3 className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors pr-2 line-clamp-2">{service.name}</h3>
-                                                        <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">/{service.unit}</Badge>
+                                {filteredServices.map(service => (
+                                    <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key={service.id}>
+                                        <SpotlightCard className="cursor-pointer hover:border-primary transition-all group">
+                                            <div onClick={() => addToCart(service)}>
+                                                <CardHeader className="p-4 pb-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <CardTitle className="text-base group-hover:text-primary line-clamp-1">{service.name}</CardTitle>
+                                                        <Badge variant="secondary" className="text-[10px]">/{service.unit}</Badge>
                                                     </div>
-                                                    {service.description && (
-                                                        <p className="text-[11px] text-muted-foreground line-clamp-1 mb-2">{service.description}</p>
-                                                    )}
-                                                    <div className="flex justify-between items-center mt-2">
-                                                        <span className="text-base font-bold text-foreground">{formatRupiah(parseFloat(service.price))}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            {inCart && (
-                                                                <Badge className="bg-primary/15 text-primary border-0 text-[10px] font-bold px-1.5 py-0 h-5">
-                                                                    {inCart.qty} {service.unit}
-                                                                </Badge>
-                                                            )}
-                                                            <div className={cn(
-                                                                "h-8 w-8 rounded-full flex items-center justify-center transition-all",
-                                                                inCart 
-                                                                    ? "bg-primary text-white shadow-md shadow-primary/25" 
-                                                                    : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white group-hover:shadow-md group-hover:shadow-primary/25"
-                                                            )}>
-                                                                <Plus className="h-4 w-4" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </SpotlightCard>
-                                        </motion.div>
-                                    );
-                                })}
+                                                </CardHeader>
+                                                <CardFooter className="p-4 pt-0 mt-2 flex justify-between items-center">
+                                                    <span className="font-bold">{formatRupiah(parseFloat(service.price))}</span>
+                                                    <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors"><Plus className="h-4 w-4" /></div>
+                                                </CardFooter>
+                                            </div>
+                                        </SpotlightCard>
+                                    </motion.div>
+                                ))}
                             </AnimatePresence>
                         </div>
                     </div>
@@ -581,8 +574,8 @@ function TransactionCreate({ customers, services, promotions }: {
                         )}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50 dark:bg-slate-900/20">
-                        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} />)}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/20">
+                        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} formatRupiah={formatRupiah} />)}
                     </div>
 
                     <div className="p-4 border-t bg-background space-y-3">
