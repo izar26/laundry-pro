@@ -46,7 +46,8 @@ import {
     Info,
     Sparkles,
     X,
-    TicketPercent
+    TicketPercent,
+    ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
@@ -231,6 +232,7 @@ function TransactionCreate({ customers, services, promotions }: {
     const [promoCode, setPromoCode] = useState('');
     const [appliedPromo, setAppliedPromo] = useState<Promotion | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [showPromoHints, setShowPromoHints] = useState(false);
 
     // Hotkeys
     useHotkeys('ctrl+f', (e) => { e.preventDefault(); searchInputRef.current?.focus(); });
@@ -567,30 +569,31 @@ function TransactionCreate({ customers, services, promotions }: {
                         {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} />)}
                     </div>
 
-                    <div className="p-3 border-t bg-background space-y-2">
+                    <div className="p-3 border-t bg-background space-y-2.5">
                         {/* Input Kode Promo */}
                         {appliedPromo ? (
-                            <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-md px-2.5 py-1.5">
-                                <TicketPercent className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">
+                                <TicketPercent className="h-4 w-4 text-emerald-600 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 truncate block">{appliedPromo.name}</span>
+                                    <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate">{appliedPromo.name}</div>
+                                    <div className="text-[10px] text-emerald-600/70 dark:text-emerald-500/70 font-mono">{appliedPromo.code}</div>
                                 </div>
-                                <button onClick={removePromoCode} className="p-0.5 hover:bg-emerald-200/50 rounded transition-colors">
-                                    <X className="h-3 w-3 text-emerald-600" />
+                                <button onClick={removePromoCode} className="p-1 hover:bg-emerald-200/50 rounded transition-colors">
+                                    <X className="h-3.5 w-3.5 text-emerald-600" />
                                 </button>
                             </div>
                         ) : (
                             <div className="flex gap-2">
-                                <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-7 text-xs uppercase font-mono" />
-                                <Button variant="secondary" size="sm" className="h-7 text-[10px] shrink-0 px-2.5" onClick={applyPromoCode} disabled={!promoCode.trim()}>Pakai</Button>
+                                <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-8 text-xs uppercase font-mono" />
+                                <Button variant="secondary" size="sm" className="h-8 text-xs shrink-0" onClick={applyPromoCode} disabled={!promoCode.trim()}>Pakai</Button>
                             </div>
                         )}
 
                         {/* Breakdown Diskon */}
-                        <div className="space-y-1 text-sm">
-                            <div className="flex justify-between text-muted-foreground text-xs"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
+                        <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
                             
-                            {/* Promo yang terapply */}
+                            {/* Promo yang terapply — breakdown per item */}
                             <AnimatePresence>
                                 {discountInfo.applied.map((info) => (
                                     <motion.div 
@@ -601,19 +604,20 @@ function TransactionCreate({ customers, services, promotions }: {
                                         className="overflow-hidden"
                                     >
                                         <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                            <span className="flex items-center gap-1 text-[11px]">
-                                                {info.isCode ? <Tag className="h-2.5 w-2.5" /> : <Sparkles className="h-2.5 w-2.5" />}
-                                                <span className="truncate max-w-[130px]">{info.promo.name}</span>
-                                                <span className="text-[9px] opacity-70">({info.label})</span>
+                                            <span className="flex items-center gap-1.5 text-xs">
+                                                {info.isCode ? <Tag className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                                                <span className="truncate max-w-[140px]" title={info.promo.name}>{info.promo.name}</span>
+                                                <span className="text-[10px] opacity-60">({info.label})</span>
                                             </span>
-                                            <span className="font-bold text-[11px]">-{formatRupiah(info.amount)}</span>
+                                            <span className="font-bold text-xs">-{formatRupiah(info.amount)}</span>
                                         </div>
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
 
+                            {/* Total diskon summary jika ada > 1 promo */}
                             {discountInfo.applied.length > 1 && (
-                                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-bold text-[11px] pt-0.5 border-t border-dashed border-emerald-200 dark:border-emerald-800">
+                                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-bold text-xs pt-0.5 border-t border-dashed border-emerald-200 dark:border-emerald-800">
                                     <span>Total Diskon</span><span>-{formatRupiah(discount)}</span>
                                 </div>
                             )}
@@ -622,7 +626,7 @@ function TransactionCreate({ customers, services, promotions }: {
                             <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-primary"><RollingNumber value={total} /></span></div>
                         </div>
 
-                        {/* Hints: Promo yang belum memenuhi syarat — compact, max 2 items */}
+                        {/* Hints: Promo yang belum memenuhi syarat — collapsible */}
                         <AnimatePresence>
                             {cart.length > 0 && discountInfo.ineligible.length > 0 && (
                                 <motion.div 
@@ -631,27 +635,63 @@ function TransactionCreate({ customers, services, promotions }: {
                                     exit={{ opacity: 0, height: 0 }}
                                     className="overflow-hidden"
                                 >
-                                    <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-md p-2 space-y-1.5 max-h-[72px] overflow-y-auto">
-                                        {discountInfo.ineligible.slice(0, 3).map((info) => (
-                                            <div key={`hint-${info.promo.id}`} className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-1 min-w-0">
-                                                    <Info className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                                                    <span className="text-[10px] text-amber-700 dark:text-amber-400 truncate">{info.promo.name}</span>
+                                    {/* Toggle bar — always visible */}
+                                    <button 
+                                        onClick={() => setShowPromoHints(prev => !prev)}
+                                        className="w-full flex items-center justify-between bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-lg px-2.5 py-1.5 hover:bg-amber-100/80 dark:hover:bg-amber-950/40 transition-colors"
+                                    >
+                                        <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                                            <Info className="h-3 w-3" />
+                                            <span className="text-[11px] font-semibold">{discountInfo.ineligible.length} promo hampir tercapai</span>
+                                        </span>
+                                        <ChevronDown className={cn("h-3.5 w-3.5 text-amber-500 transition-transform duration-200", showPromoHints && "rotate-180")} />
+                                    </button>
+
+                                    {/* Detail — expandable */}
+                                    <AnimatePresence>
+                                        {showPromoHints && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="bg-amber-50/50 dark:bg-amber-950/10 border-x border-b border-amber-200/60 dark:border-amber-800/40 rounded-b-lg px-2.5 py-2 space-y-2 -mt-1">
+                                                    {discountInfo.ineligible.map((info) => (
+                                                        <div key={`hint-${info.promo.id}`} className="space-y-1">
+                                                            <div className="flex justify-between items-baseline">
+                                                                <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300 truncate max-w-[170px]">{info.promo.name}</span>
+                                                                <span className="text-[10px] text-amber-600 dark:text-amber-500 ml-2 shrink-0">
+                                                                    {info.promo.type === 'percentage' ? `${parseFloat(info.promo.value)}%` : formatRupiah(parseFloat(info.promo.value))}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-amber-600/80 dark:text-amber-500/80">{info.reason}</div>
+                                                            {info.progress !== undefined && (
+                                                                <div className="w-full bg-amber-200/50 dark:bg-amber-900/30 rounded-full h-1">
+                                                                    <motion.div 
+                                                                        className="bg-amber-500 dark:bg-amber-400 h-1 rounded-full"
+                                                                        initial={{ width: 0 }}
+                                                                        animate={{ width: `${info.progress}%` }}
+                                                                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <span className="text-[9px] text-amber-600/70 dark:text-amber-500/70 shrink-0 whitespace-nowrap">{info.reason.split('(')[1]?.replace(')', '') || ''}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
                         {/* Payment Method */}
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-1.5 gap-0.5"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
-                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-1.5 gap-0.5"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans</span></Button>
+                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-2 gap-1"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
+                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans (Online)</span></Button>
                         </div>
-                        <Button className="w-full h-10 font-bold text-base" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
+                        <Button className="w-full h-11 font-bold text-base" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
                     </div>
                 </div>
             </div>
