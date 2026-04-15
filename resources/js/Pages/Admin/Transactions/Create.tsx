@@ -50,8 +50,6 @@ import { Separator } from '@/Components/ui/separator';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import useSynth from '@/hooks/useSynth';
 import Fuse from 'fuse.js';
 
 // Tipe Data
@@ -164,7 +162,6 @@ function TransactionCreate({ customers, services, promotions }: {
     const [serviceSearch, setServiceSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'kiloan' | 'satuan'>('all');
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const [voiceStatus, setVoiceStatus] = useState<string>('Siap mendengarkan...');
 
     // Fuse.js Instances
     const serviceFuse = useMemo(() => new Fuse(services, {
@@ -206,163 +203,8 @@ function TransactionCreate({ customers, services, promotions }: {
     const [appliedPromo, setAppliedPromo] = useState<Promotion | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Sound Hooks
-    const { playSuccess, playAdd, playRemove, playError, speak } = useSynth();
-
-    // Voice Handlers
-    const processAddCommand = (input: string) => {
-        setVoiceStatus(`Memproses: "${input}"...`);
-        const lowerInput = input.toLowerCase().replace('.', ','); 
-        
-        const qtyMatch = lowerInput.match(/^(\d+([.,]\d+)?)/);
-        let qty = 1;
-        let searchName = lowerInput;
-
-        if (qtyMatch) {
-            qty = parseFloat(qtyMatch[0].replace(',', '.'));
-            searchName = lowerInput.replace(/^(\d+([.,]\d+)?)\s*(kilo|kg|pcs|potong|set|meter|buah)?\s*/, '').trim();
-        }
-
-        const results = serviceFuse.search(searchName);
-        
-        if (results.length > 0) {
-            const service = results[0].item;
-            setCart(prev => {
-                const existing = prev.find(item => item.serviceId === service.id);
-                if (existing) {
-                    return prev.map(item => 
-                        item.serviceId === service.id ? { ...item, qty: item.qty + qty } : item
-                    );
-                }
-                return [...prev, {
-                    serviceId: service.id,
-                    name: service.name,
-                    price: parseFloat(service.price),
-                    unit: service.unit,
-                    qty: qty
-                }];
-            });
-            playAdd();
-            const response = `Oke, ${qty} ${service.unit} ${service.name}`;
-            speak(response);
-            setVoiceStatus(response);
-            toast.success(response);
-        } else {
-            playError();
-            const msg = `Maaf, tidak menemukan layanan "${searchName}"`;
-            speak(msg);
-            setVoiceStatus(msg);
-            toast.error(msg);
-        }
-    };
-
-    const processCustomerCommand = (name: string) => {
-        setVoiceStatus(`Mencari pelanggan: "${name}"...`);
-        const results = customerFuse.search(name);
-        if (results.length > 0) {
-            const customer = results[0].item;
-            setSelectedCustomer(customer);
-            playSuccess();
-            const msg = `Pelanggan terpilih: ${customer.name}`;
-            speak(msg);
-            setVoiceStatus(msg);
-            toast.success(msg);
-        } else {
-            playError();
-            const msg = `Maaf, tidak menemukan pelanggan bernama ${name}`;
-            speak(msg);
-            setVoiceStatus(msg);
-            toast.error(msg);
-        }
-    };
-
-    const commands = [
-        { command: ['tambah *', 'pesan *', 'masukkan *', 'input *'], callback: (item: string) => processAddCommand(item) },
-        { command: ['atas nama *', 'pelanggan *', 'customer *', 'pembeli *'], callback: (name: string) => processCustomerCommand(name) },
-        {
-            command: ['hapus *', 'buang *', 'cancel *'],
-            callback: (item: string) => {
-                const cartFuse = new Fuse(cart, { keys: ['name'], threshold: 0.4 });
-                const results = cartFuse.search(item);
-                if (results.length > 0) {
-                    const cartItem = results[0].item;
-                    removeItem(cartItem.serviceId);
-                    const msg = `Menghapus ${cartItem.name}`;
-                    speak(msg);
-                    setVoiceStatus(msg);
-                    toast.success(msg);
-                } else {
-                    speak("Barang tidak ada di keranjang");
-                }
-            }
-        },
-        {
-            command: ['bayar', 'checkout', 'selesai', 'proses', 'transaksi'],
-            callback: () => {
-                if (cart.length > 0 && selectedCustomer) {
-                    speak("Siap, memproses pembayaran");
-                    setVoiceStatus("Memproses Pembayaran...");
-                    handleCheckout();
-                } else {
-                    playError();
-                    let msg = "Gagal. Keranjang kosong atau pelanggan belum dipilih.";
-                    speak(msg);
-                    setVoiceStatus(msg);
-                    toast.error(msg);
-                }
-            }
-        },
-        {
-            command: ['batal', 'tutup', 'stop', 'berhenti', 'matikan'],
-            callback: () => {
-                speak("Mikrofon dimatikan");
-                SpeechRecognition.stopListening();
-                setVoiceStatus("Nonaktif");
-            }
-        },
-        {
-            command: 'reset',
-            callback: () => {
-                if(confirm('Reset keranjang?')) {
-                    setCart([]);
-                    playRemove();
-                    speak("Keranjang dikosongkan");
-                }
-            }
-        },
-        {
-            command: '*',
-            callback: (command: string) => {
-                if (!command || command.length < 2) return;
-                setVoiceStatus(`Tidak mengerti: "${command}"`);
-            }
-        }
-    ];
-
-    const { transcript, listening, browserSupportsSpeechRecognition, isMicrophoneAvailable } = useSpeechRecognition({ commands });
-
-    useEffect(() => {
-        if (listening) {
-            if (transcript) setVoiceStatus(`Mendengar: "${transcript}"`);
-            else setVoiceStatus("Mendengarkan...");
-        }
-    }, [transcript, listening]);
-
-    const toggleMic = () => {
-        if (listening) {
-            SpeechRecognition.stopListening();
-        } else {
-            if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-                toast.error("Fitur Suara memerlukan HTTPS atau Localhost!");
-            }
-            SpeechRecognition.startListening({ continuous: true, language: 'id-ID' });
-            toast.info("Mendengarkan...", { description: "Coba: 'Tambah 5 kilo Cuci Komplit'" });
-        }
-    };
-
     // Hotkeys
     useHotkeys('ctrl+f', (e) => { e.preventDefault(); searchInputRef.current?.focus(); });
-    useHotkeys('ctrl+m', (e) => { e.preventDefault(); toggleMic(); });
     useHotkeys('ctrl+enter', () => { if(cart.length > 0 && selectedCustomer) handleCheckout(); });
 
     // Load Midtrans
@@ -391,7 +233,6 @@ function TransactionCreate({ customers, services, promotions }: {
             if (existing) return prev.map(item => item.serviceId === service.id ? { ...item, qty: item.qty + 1 } : item);
             return [...prev, { serviceId: service.id, name: service.name, price: parseFloat(service.price), unit: service.unit, qty: 1 }];
         });
-        playAdd();
         toast.success(`${service.name} ditambahkan.`);
     };
 
@@ -403,12 +244,10 @@ function TransactionCreate({ customers, services, promotions }: {
             }
             return item;
         }));
-        playAdd();
     };
 
     const removeItem = (id: number) => {
         setCart(prev => prev.filter(item => item.serviceId !== id));
-        playRemove();
     };
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
@@ -438,8 +277,8 @@ function TransactionCreate({ customers, services, promotions }: {
 
     const applyPromoCode = () => {
         const promo = promotions.find(p => p.code === promoCode.toUpperCase());
-        if (promo) { setAppliedPromo(promo); playSuccess(); toast.success("Promo OK!"); }
-        else { playError(); toast.error("Promo Gagal!"); setAppliedPromo(null); }
+        if (promo) { setAppliedPromo(promo); toast.success("Promo OK!"); }
+        else { toast.error("Promo Gagal!"); setAppliedPromo(null); }
     };
 
     const handleCheckout = async () => {
@@ -451,14 +290,14 @@ function TransactionCreate({ customers, services, promotions }: {
             const { snap_token } = response.data;
             if (paymentMethod === 'midtrans' && snap_token) {
                 (window as any).snap.pay(snap_token, {
-                    onSuccess: () => { playSuccess(); confetti(); router.visit(route('transactions.index')); },
+                    onSuccess: () => { confetti(); router.visit(route('transactions.index')); },
                     onPending: () => router.visit(route('transactions.index')),
-                    onError: () => playError()
+                    onError: () => toast.error("Pembayaran gagal")
                 });
             } else {
-                playSuccess(); confetti(); toast.success("Berhasil!"); router.visit(route('transactions.index'));
+                confetti(); toast.success("Berhasil!"); router.visit(route('transactions.index'));
             }
-        } catch (e: any) { playError(); toast.error("Error: " + (e.response?.data?.message || "Gagal")); }
+        } catch (e: any) { toast.error("Error: " + (e.response?.data?.message || "Gagal")); }
         finally { setIsProcessing(false); }
     };
 
@@ -473,13 +312,10 @@ function TransactionCreate({ customers, services, promotions }: {
                         <div>
                             <h2 className="text-2xl font-bold tracking-tight">Kasir (POS)</h2>
                             <p className="text-muted-foreground text-sm flex items-center gap-2">
-                                <Keyboard className="h-3 w-3" /> Ctrl+F cari, Ctrl+M suara
+                                <Keyboard className="h-3 w-3" /> Ctrl+F cari
                             </p>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant={listening ? "destructive" : "outline"} size="icon" onClick={toggleMic}>
-                                {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                            </Button>
                             <Button variant="ghost" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2"/> Kembali</Button>
                         </div>
                     </div>
@@ -520,30 +356,7 @@ function TransactionCreate({ customers, services, promotions }: {
                             </AnimatePresence>
                         </div>
                         
-                        {/* Panel Asisten Suara (Modern & Non-Blocking) */}
-                        <AnimatePresence>
-                            {listening && (
-                                <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-6 left-0 right-0 z-[100] flex justify-center px-4">
-                                    <div className="bg-zinc-900/95 dark:bg-zinc-100/95 text-white dark:text-black backdrop-blur shadow-2xl rounded-2xl p-4 flex items-center gap-4 max-w-xl w-full border border-white/10">
-                                        <div className="relative h-10 w-10 flex items-center justify-center bg-red-500 rounded-full">
-                                            <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50"></span>
-                                            <Mic className="h-5 w-5 text-white relative z-10" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-bold uppercase opacity-50">Sistem Mendengar</p>
-                                            <p className="text-lg font-medium truncate">{voiceStatus}</p>
-                                        </div>
-                                        <Button variant="ghost" size="icon" onClick={toggleMic} className="rounded-full hover:bg-white/10"><MicOff className="h-5 w-5" /></Button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
 
-                        {(!window.isSecureContext && window.location.hostname !== 'localhost') && (
-                            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-destructive text-white p-4 rounded-xl shadow-2xl text-center">
-                                <strong>Gunakan Localhost atau HTTPS!</strong><br/>Browser memblokir mic di alamat IP.
-                            </div>
-                        )}
                     </div>
                 </div>
 

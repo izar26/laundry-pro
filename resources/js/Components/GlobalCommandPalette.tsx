@@ -28,12 +28,16 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/Components/ui/command"
-import { router } from "@inertiajs/react"
+import { router, usePage } from "@inertiajs/react"
 import { useTheme } from "@/Components/ThemeProvider"
 
 export function GlobalCommandPalette() {
   const [open, setOpen] = React.useState(false)
   const { setTheme } = useTheme()
+  const { auth } = usePage().props as any;
+  const userRoles = auth.user.roles || [];
+  const isAdminOrOwner = userRoles.includes('admin') || userRoles.includes('owner');
+  const isPegawai = userRoles.includes('pegawai');
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -80,32 +84,40 @@ export function GlobalCommandPalette() {
               <ShoppingBag className="mr-2 h-4 w-4" />
               <span>Transaksi</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => router.visit(route('customers.index')))}>
-              <Users className="mr-2 h-4 w-4" />
-              <span>Pelanggan</span>
-            </CommandItem>
+            {(isAdminOrOwner || isPegawai) && (
+                <CommandItem onSelect={() => runCommand(() => router.visit(route('customers.index')))}>
+                <Users className="mr-2 h-4 w-4" />
+                <span>Pelanggan</span>
+                </CommandItem>
+            )}
             <CommandItem onSelect={() => runCommand(() => router.visit(route('services.index')))}>
               <Shirt className="mr-2 h-4 w-4" />
               <span>Layanan</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => router.visit(route('reports.index')))}>
-              <FileText className="mr-2 h-4 w-4" />
-              <span>Laporan</span>
-            </CommandItem>
+            {isAdminOrOwner && (
+                <CommandItem onSelect={() => runCommand(() => router.visit(route('reports.index')))}>
+                <FileText className="mr-2 h-4 w-4" />
+                <span>Laporan</span>
+                </CommandItem>
+            )}
           </CommandGroup>
           
           <CommandSeparator />
           
           <CommandGroup heading="Aksi Cepat">
-            <CommandItem onSelect={() => runCommand(() => router.visit(route('transactions.create')))}>
-              <Plus className="mr-2 h-4 w-4" />
-              <span>Buat Transaksi Baru</span>
-              <CommandShortcut>⌘N</CommandShortcut>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => router.visit(route('settings.index')))}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Pengaturan Aplikasi</span>
-            </CommandItem>
+            {!userRoles.includes('owner') && (
+                <CommandItem onSelect={() => runCommand(() => router.visit(route('transactions.create')))}>
+                <Plus className="mr-2 h-4 w-4" />
+                <span>Buat Transaksi Baru</span>
+                <CommandShortcut>⌘N</CommandShortcut>
+                </CommandItem>
+            )}
+            {isAdminOrOwner && (
+                <CommandItem onSelect={() => runCommand(() => router.visit(route('settings.index')))}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Pengaturan Aplikasi</span>
+                </CommandItem>
+            )}
           </CommandGroup>
           
           <CommandSeparator />
