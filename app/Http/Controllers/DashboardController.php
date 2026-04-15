@@ -74,24 +74,35 @@ class DashboardController extends Controller
                 });
 
         } else {
-            // --- DATA GLOBAL (ADMIN, OWNER, PEGAWAI) ---
+            // --- DATA PEGAWAI / ADMIN / OWNER ---
 
-            // 1. Statistik Global
+            $applyRoleScope = function ($query) use ($user) {
+                if ($user->hasRole('pegawai')) {
+                    $query->where('user_id', $user->id);
+                }
+                // Admin & Owner lihat semua
+            };
+
+            $statsBase = fn() => Transaction::query()->tap($applyRoleScope);
+
+            // 1. Statistik
             $stats = [
-                'revenue_today' => Transaction::whereDate('created_at', today())
+                'revenue_today' => $statsBase()->whereDate('created_at', today())
                     ->where('payment_status', 'paid')
                     ->sum('final_amount'),
-                'revenue_month' => Transaction::whereMonth('created_at', today()->month)
+                'revenue_month' => $statsBase()->whereMonth('created_at', today()->month)
                     ->where('payment_status', 'paid')
                     ->sum('final_amount'),
-                'trx_active' => Transaction::whereIn('status', ['new', 'process', 'ready', 'pending'])->count(),
+                'trx_active' => $statsBase()->whereIn('status', ['new', 'process', 'ready', 'pending'])->count(),
+                // Pelanggan count tetap global
                 'customers_total' => User::role('pelanggan')->count(),
                 'customers_new_month' => User::role('pelanggan')->whereMonth('created_at', today()->month)->count(),
                 'is_pelanggan' => false
             ];
 
-            // 2. Grafik Global
-            $chartData = Transaction::select(
+            // 2. Grafik Global / Pegawai
+            $chartData = Transaction::query()->tap($applyRoleScope)
+                ->select(
                     DB::raw('DATE(created_at) as date'),
                     DB::raw('SUM(final_amount) as total')
                 )
@@ -108,8 +119,9 @@ class DashboardController extends Controller
                     ];
                 });
 
-            // 3. Transaksi Terbaru Global
-            $recentTransactions = Transaction::with(['customer.user', 'details'])
+            // 3. Transaksi Terbaru
+            $recentTransactions = Transaction::query()->tap($applyRoleScope)
+                ->with(['customer.user', 'details'])
                 ->latest()
                 ->take(5)
                 ->get()
