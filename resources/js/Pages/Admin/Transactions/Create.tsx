@@ -308,7 +308,9 @@ function TransactionCreate({ customers, services, promotions }: {
                 return;
             }
 
-            // Cek min_weight
+            // Cek min_weight — hanya cek jika promo ini memang bukan khusus layanan satuan
+            // Promo dengan service_id (layanan spesifik) yang unit-nya bukan kg, 
+            // TIDAK boleh gagal gara-gara min_weight terhadap berat global
             if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) {
                 const needed = parseFloat(p.min_weight);
                 const progress = Math.min(100, Math.round((totalWeightKg / needed) * 100));
@@ -354,10 +356,22 @@ function TransactionCreate({ customers, services, promotions }: {
         // 1. Apply promo kode (manual) dulu
         if (appliedPromo) processPromo(appliedPromo, true);
         
-        // 2. Apply auto promos (tanpa kode)
-        promotions.filter(p => !p.code).forEach(p => processPromo(p, false));
+        // 2. Apply auto promos (tanpa kode) — handle baik null maupun empty string
+        promotions.filter(p => !p.code || p.code.trim() === '').forEach(p => processPromo(p, false));
         
         totalDiscount = Math.min(totalDiscount, subtotal);
+
+        // Debug log — bisa dihapus nanti
+        if (cart.length > 0) {
+            console.log('[Diskon Debug]', { 
+                totalWeightKg, subtotal, totalDiscount,
+                allPromos: promotions.map(p => ({ id: p.id, name: p.name, code: p.code, service_id: p.service_id, min_weight: p.min_weight })),
+                autoPromos: promotions.filter(p => !p.code || p.code.trim() === '').map(p => p.name),
+                applied: applied.map(a => ({ name: a.promo.name, amount: a.amount })),
+                ineligible: ineligible.map(i => ({ name: i.promo.name, reason: i.reason }))
+            });
+        }
+
         return { totalDiscount, applied, ineligible };
     }, [cart, appliedPromo, subtotal, totalWeightKg, promotions, services]);
 
