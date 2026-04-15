@@ -70,6 +70,8 @@ type Promotion = {
     start_date: string | null;
     end_date: string | null;
     is_active: boolean;
+    quota: number | null;
+    used_count: number;
 };
 
 // Komponen Toggle Status
@@ -135,6 +137,7 @@ function PromotionForm({
         min_amount: '',
         description: '',
         is_active: true,
+        quota: '',
     });
 
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -153,6 +156,7 @@ function PromotionForm({
                 min_amount: promotion.min_amount ? parseFloat(promotion.min_amount).toString() : '',
                 description: promotion.description || '',
                 is_active: promotion.is_active,
+                quota: promotion.quota ? promotion.quota.toString() : '',
             });
             setDateRange({
                 from: promotion.start_date ? new Date(promotion.start_date + 'T00:00:00') : undefined,
@@ -161,7 +165,7 @@ function PromotionForm({
         } else {
             setFormData({
                 name: '', code: '', service_id: 'all', type: 'percentage',
-                value: '', min_weight: '', min_amount: '', description: '', is_active: true,
+                value: '', min_weight: '', min_amount: '', description: '', is_active: true, quota: '',
             });
             setDateRange(undefined);
         }
@@ -185,6 +189,7 @@ function PromotionForm({
             min_amount: formData.min_amount || null,
             code: formData.code || null,
             description: formData.description || null,
+            quota: formData.quota ? parseInt(formData.quota) : null,
         };
 
         const options = {
@@ -246,6 +251,11 @@ function PromotionForm({
                         <div className="grid gap-2">
                             <Label htmlFor="code">Kode Voucher (Opsional)</Label>
                             <Input id="code" placeholder="KODE" value={formData.code} onChange={(e) => setField('code', e.target.value.toUpperCase())} className="uppercase font-mono" />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="quota">Batas Pemakaian (Opsional)</Label>
+                            <Input id="quota" type="number" min="1" placeholder="Tidak ada batas" value={formData.quota} onChange={(e) => setField('quota', e.target.value)} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -356,6 +366,21 @@ function PromotionsIndex({ promotions, services, canManagePromotions = false }: 
             cell: ({ row }) => (
                 <div className="font-bold text-emerald-600">
                     {row.original.type === 'percentage' ? `${parseFloat(row.original.value)}%` : `Rp${parseFloat(row.original.value).toLocaleString()}`}
+                </div>
+            )
+        },
+        {
+            accessorKey: "quota",
+            header: "Keterpakaian",
+            cell: ({ row }) => (
+                <div className="flex flex-col text-sm">
+                    {row.original.quota ? (
+                        <span className={row.original.used_count >= row.original.quota ? "text-destructive font-medium" : ""}>
+                            {row.original.used_count} / {row.original.quota} kali
+                        </span>
+                    ) : (
+                        <span className="text-muted-foreground">{row.original.used_count} / ∞</span>
+                    )}
                 </div>
             )
         },

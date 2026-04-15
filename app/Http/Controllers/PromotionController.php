@@ -49,6 +49,7 @@ class PromotionController extends Controller
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'description' => 'nullable|string',
                 'is_active' => 'boolean',
+                'quota' => 'nullable|integer|min:1',
             ]);
 
             \Log::info('=== PROMO VALIDATED ===', $validated);
@@ -79,6 +80,7 @@ class PromotionController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
+            'quota' => 'nullable|integer|min:1',
         ]);
 
         $promotion->update($validated);

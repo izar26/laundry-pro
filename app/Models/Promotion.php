@@ -22,6 +22,8 @@ class Promotion extends Model
         'start_date',
         'end_date',
         'is_active',
+        'quota',
+        'used_count',
     ];
 
     protected $casts = [
@@ -31,6 +33,8 @@ class Promotion extends Model
         'value' => 'decimal:2',
         'min_weight' => 'decimal:2',
         'min_amount' => 'decimal:2',
+        'quota' => 'integer',
+        'used_count' => 'integer',
     ];
 
     public function service(): BelongsTo
