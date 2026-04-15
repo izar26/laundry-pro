@@ -23,6 +23,7 @@ type Transaction = {
     user: { name: string };
     total_amount: string;
     discount_amount: string;
+    discount_details?: { promo_id: number; name: string; code: string | null; amount: number }[] | null;
     final_amount: string;
     payment_method: string;
     payment_status: string;
@@ -164,10 +165,22 @@ function TransactionShow({ transaction }: { transaction: Transaction }) {
                                         <span>{formatRupiah(transaction.total_amount)}</span>
                                     </div>
                                     {parseFloat(transaction.discount_amount) > 0 && (
-                                        <div className="flex justify-between text-sm text-emerald-600">
-                                            <span>Diskon</span>
-                                            <span>- {formatRupiah(transaction.discount_amount)}</span>
-                                        </div>
+                                        <>
+                                            <div className="flex justify-between text-sm text-emerald-600">
+                                                <span>Total Diskon</span>
+                                                <span>- {formatRupiah(transaction.discount_amount)}</span>
+                                            </div>
+                                            {transaction.discount_details && transaction.discount_details.length > 0 && (
+                                                <div className="pl-4 mt-1 border-l-2 border-emerald-100 dark:border-emerald-900/30 space-y-1">
+                                                    {transaction.discount_details.map((detail, idx) => (
+                                                        <div key={idx} className="flex justify-between text-xs text-emerald-600/80">
+                                                            <span>↳ {detail.name}</span>
+                                                            <span>- {formatRupiah(detail.amount.toString())}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                     <Separator className="my-2" />
                                     <div className="flex justify-between text-lg font-bold">

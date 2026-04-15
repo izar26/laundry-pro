@@ -208,6 +208,7 @@ class TransactionController extends Controller
             $discountAmount = 0;
             $promosToCheck = [];
             $processedPromoIds = []; // Anti double-apply
+            $discountDetailsArray = []; // Menyimpan detail potongan tiap promo
 
             if ($request->filled('promo_code')) {
                 $codePromo = Promotion::where('code', $request->promo_code)
@@ -270,8 +271,17 @@ class TransactionController extends Controller
                     } else {
                         $promoVal = min($promo->value, $baseCalculation); // Cap fixed discount ke base value
                     }
-                    $discountAmount += $promoVal;
-                    $processedPromoIds[] = $promo->id; // Tandai sudah diproses
+                    if ($promoVal > 0) {
+                        $discountAmount += $promoVal;
+                        $processedPromoIds[] = $promo->id; // Tandai sudah diproses
+                        
+                        $discountDetailsArray[] = [
+                            'promo_id' => $promo->id,
+                            'name' => $promo->name,
+                            'code' => $promo->code,
+                            'amount' => $promoVal
+                        ];
+                    }
                 }
             }
 
@@ -290,6 +300,7 @@ class TransactionController extends Controller
                 'user_id' => auth()->id(),
                 'total_amount' => $totalAmount,
                 'discount_amount' => $discountAmount,
+                'discount_details' => count($discountDetailsArray) > 0 ? $discountDetailsArray : null,
                 'final_amount' => $finalAmount,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => $initialPaymentStatus,

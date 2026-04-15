@@ -130,9 +130,17 @@
             </div>
             @if($transaction->discount_amount > 0)
             <div class="total-row">
-                <span>Diskon</span>
+                <span>Total Diskon</span>
                 <span>-{{ number_format($transaction->discount_amount, 0, ',', '.') }}</span>
             </div>
+                @if(is_array($transaction->discount_details) && count($transaction->discount_details) > 0)
+                    @foreach($transaction->discount_details as $detail)
+                    <div class="total-row" style="font-size: 10px; padding-left: 5px;">
+                        <span>↳ {{ $detail['name'] }}</span>
+                        <span>-{{ number_format($detail['amount'], 0, ',', '.') }}</span>
+                    </div>
+                    @endforeach
+                @endif
             @endif
             <div class="total-row final-total">
                 <span>TOTAL BAYAR</span>

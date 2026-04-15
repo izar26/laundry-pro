@@ -17,6 +17,7 @@ class Transaction extends Model
         'user_id',
         'total_amount',
         'discount_amount',
+        'discount_details',
         'final_amount',
         'payment_method',
         'payment_status',
@@ -29,6 +30,7 @@ class Transaction extends Model
         'total_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'final_amount' => 'decimal:2',
+        'discount_details' => 'array',
     ];
 
     public function customer(): BelongsTo
