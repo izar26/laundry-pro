@@ -194,8 +194,11 @@ function PromotionForm({
                 setIsSubmitting(false);
             },
             onError: (errors: any) => {
+                console.error('=== PROMO FORM ERRORS ===', errors);
+                console.error('=== PAYLOAD SENT ===', payload);
                 setFormErrors(errors);
-                toast.error('Terjadi kesalahan, periksa form.');
+                const errorMessages = Object.values(errors).flat().join(', ');
+                toast.error('Gagal: ' + (errorMessages || JSON.stringify(errors)));
                 setIsSubmitting(false);
             },
             preserveScroll: true,
