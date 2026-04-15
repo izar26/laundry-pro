@@ -34,23 +34,35 @@ class PromotionController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:50|unique:promotions',
-            'service_id' => 'nullable|exists:services,id', // Validasi service_id
-            'type' => 'required|in:percentage,fixed',
-            'value' => 'required|numeric|min:0',
-            'min_weight' => 'nullable|numeric|min:0',
-            'min_amount' => 'nullable|numeric|min:0',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
+        \Log::info('=== PROMO STORE REQUEST ===', $request->all());
 
-        Promotion::create($validated);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'code' => 'nullable|string|max:50|unique:promotions',
+                'service_id' => 'nullable|exists:services,id',
+                'type' => 'required|in:percentage,fixed',
+                'value' => 'required|numeric|min:0',
+                'min_weight' => 'nullable|numeric|min:0',
+                'min_amount' => 'nullable|numeric|min:0',
+                'start_date' => 'nullable|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'description' => 'nullable|string',
+                'is_active' => 'boolean',
+            ]);
 
-        return redirect()->back()->with('message', 'Promosi berhasil dibuat.');
+            \Log::info('=== PROMO VALIDATED ===', $validated);
+
+            Promotion::create($validated);
+
+            return redirect()->back()->with('message', 'Promosi berhasil dibuat.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('=== PROMO VALIDATION FAILED ===', $e->errors());
+            throw $e;
+        } catch (\Exception $e) {
+            \Log::error('=== PROMO STORE ERROR ===', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            throw $e;
+        }
     }
 
     public function update(Request $request, Promotion $promotion)
