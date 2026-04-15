@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Calendar } from "@/Components/ui/calendar";
+import { SimpleCalendar as Calendar } from "@/Components/ui/simple-calendar";
 import {
   Popover,
   PopoverContent,
@@ -52,6 +52,7 @@ import {
 import { toast } from 'sonner';
 import { Badge } from '@/Components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
 
 // Tipe Data
 type Service = { id: number; name: string };
@@ -93,7 +94,7 @@ const StatusToggle = ({ row, canManage }: { row: any, canManage: boolean }) => {
                 toast.error("Gagal mengubah status.");
                 setIsLoading(false);
             },
-            preserveState: true, // PENTING: Mencegah skeleton
+            preserveState: true,
             preserveScroll: true
         });
     };
@@ -104,7 +105,7 @@ const StatusToggle = ({ row, canManage }: { row: any, canManage: boolean }) => {
                 checked={promo.is_active} 
                 onCheckedChange={handleToggle} 
                 disabled={isLoading || !canManage}
-                className="scale-75" // Sedikit diperkecil agar pas di tabel
+                className="scale-75"
             />
             <span className={cn("text-xs", promo.is_active ? "text-emerald-600 font-medium" : "text-muted-foreground")}>
                 {promo.is_active ? 'Aktif' : 'Mati'}
@@ -124,7 +125,7 @@ function PromotionForm({
     isOpen: boolean, 
     setIsOpen: (open: boolean) => void 
 }) {
-    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
+    const [formData, setFormData] = useState({
         name: '',
         code: '',
         service_id: 'all' as string | number,
@@ -132,15 +133,17 @@ function PromotionForm({
         value: '',
         min_weight: '',
         min_amount: '',
-        start_date: undefined as Date | undefined,
-        end_date: undefined as Date | undefined,
         description: '',
         is_active: true,
     });
 
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
     useEffect(() => {
         if (promotion) {
-            setData({
+            setFormData({
                 name: promotion.name,
                 code: promotion.code || '',
                 service_id: promotion.service_id || 'all',
@@ -148,43 +151,60 @@ function PromotionForm({
                 value: parseFloat(promotion.value).toString(),
                 min_weight: promotion.min_weight ? parseFloat(promotion.min_weight).toString() : '',
                 min_amount: promotion.min_amount ? parseFloat(promotion.min_amount).toString() : '',
-                start_date: promotion.start_date ? new Date(promotion.start_date) : undefined,
-                end_date: promotion.end_date ? new Date(promotion.end_date) : undefined,
                 description: promotion.description || '',
                 is_active: promotion.is_active,
             });
+            setDateRange({
+                from: promotion.start_date ? new Date(promotion.start_date + 'T00:00:00') : undefined,
+                to: promotion.end_date ? new Date(promotion.end_date + 'T00:00:00') : undefined,
+            });
         } else {
-            reset();
-            setData('is_active', true);
+            setFormData({
+                name: '', code: '', service_id: 'all', type: 'percentage',
+                value: '', min_weight: '', min_amount: '', description: '', is_active: true,
+            });
+            setDateRange(undefined);
         }
-        clearErrors();
+        setFormErrors({});
     }, [promotion, isOpen]);
+
+    const setField = (key: string, value: any) => {
+        setFormData(prev => ({ ...prev, [key]: value }));
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+        setIsSubmitting(true);
+
         const payload = {
-            ...data,
-            service_id: data.service_id === 'all' ? null : data.service_id,
-            start_date: data.start_date ? format(data.start_date, 'yyyy-MM-dd') : null,
-            end_date: data.end_date ? format(data.end_date, 'yyyy-MM-dd') : null,
+            ...formData,
+            service_id: formData.service_id === 'all' ? null : formData.service_id,
+            start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
+            end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+            min_weight: formData.min_weight || null,
+            min_amount: formData.min_amount || null,
+            code: formData.code || null,
+            description: formData.description || null,
         };
 
         const options = {
             onSuccess: () => {
                 setIsOpen(false);
-                reset();
                 toast.success('Promosi berhasil disimpan.');
+                setIsSubmitting(false);
             },
-            onError: () => toast.error('Terjadi kesalahan.')
+            onError: (errors: any) => {
+                setFormErrors(errors);
+                toast.error('Terjadi kesalahan, periksa form.');
+                setIsSubmitting(false);
+            },
+            preserveScroll: true,
         };
 
         if (promotion) {
-            // @ts-ignore
-            put(route('promotions.update', promotion.id), { ...payload, onSuccess: options.onSuccess, onError: options.onError });
+            router.put(route('promotions.update', promotion.id), payload, options);
         } else {
-            // @ts-ignore
-            post(route('promotions.store'), { ...payload, onSuccess: options.onSuccess, onError: options.onError });
+            router.post(route('promotions.store'), payload, options);
         }
     };
 
@@ -198,15 +218,15 @@ function PromotionForm({
                     <div className="space-y-4">
                         <div className="grid gap-2">
                             <Label htmlFor="name">Nama Promo <span className="text-red-500">*</span></Label>
-                            <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                            {errors.name && <span className="text-xs text-destructive">{errors.name}</span>}
+                            <Input id="name" value={formData.name} onChange={(e) => setField('name', e.target.value)} />
+                            {formErrors.name && <span className="text-xs text-destructive">{formErrors.name}</span>}
                         </div>
                         
                         <div className="grid gap-2">
                             <Label>Berlaku Untuk Layanan</Label>
                             <Select 
-                                value={data.service_id.toString()} 
-                                onValueChange={(val) => setData('service_id', val === 'all' ? 'all' : parseInt(val))}
+                                value={formData.service_id.toString()} 
+                                onValueChange={(val) => setField('service_id', val === 'all' ? 'all' : parseInt(val))}
                             >
                                 <SelectTrigger>
                                     <SelectValue />
@@ -222,13 +242,13 @@ function PromotionForm({
 
                         <div className="grid gap-2">
                             <Label htmlFor="code">Kode Voucher (Opsional)</Label>
-                            <Input id="code" placeholder="KODE" value={data.code} onChange={(e) => setData('code', e.target.value.toUpperCase())} className="uppercase font-mono" />
+                            <Input id="code" placeholder="KODE" value={formData.code} onChange={(e) => setField('code', e.target.value.toUpperCase())} className="uppercase font-mono" />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>Tipe</Label>
-                                <Select value={data.type} onValueChange={(val: any) => setData('type', val)}>
+                                <Select value={formData.type} onValueChange={(val: any) => setField('type', val)}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="percentage">Persentase (%)</SelectItem>
@@ -237,8 +257,9 @@ function PromotionForm({
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Nilai</Label>
-                                <Input type="number" value={data.value} onChange={(e) => setData('value', e.target.value)} />
+                                <Label>Nilai <span className="text-red-500">*</span></Label>
+                                <Input type="number" value={formData.value} onChange={(e) => setField('value', e.target.value)} />
+                                {formErrors.value && <span className="text-xs text-destructive">{formErrors.value}</span>}
                             </div>
                         </div>
                     </div>
@@ -247,46 +268,54 @@ function PromotionForm({
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>Min. Berat (Kg)</Label>
-                                <Input type="number" value={data.min_weight} onChange={(e) => setData('min_weight', e.target.value)} />
+                                <Input type="number" value={formData.min_weight} onChange={(e) => setField('min_weight', e.target.value)} />
                             </div>
                             <div className="grid gap-2">
                                 <Label>Min. Transaksi (Rp)</Label>
-                                <Input type="number" value={data.min_amount} onChange={(e) => setData('min_amount', e.target.value)} />
+                                <Input type="number" value={formData.min_amount} onChange={(e) => setField('min_amount', e.target.value)} />
                             </div>
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Periode</Label>
-                            <div className="grid gap-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="justify-start font-normal">
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.start_date ? format(data.start_date, "dd MMM yyyy") : "Mulai"}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={data.start_date} onSelect={(d) => setData('start_date', d)} /></PopoverContent>
-                                </Popover>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="justify-start font-normal">
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.end_date ? format(data.end_date, "dd MMM yyyy") : "Selesai"}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={data.end_date} onSelect={(d) => setData('end_date', d)} /></PopoverContent>
-                                </Popover>
-                            </div>
+                            <Label>Periode Promo</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn("w-full justify-start font-normal", !dateRange && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dateRange?.from ? (
+                                            dateRange.to ? (
+                                                <>{format(dateRange.from, "dd MMM yyyy", { locale: idLocale })} — {format(dateRange.to, "dd MMM yyyy", { locale: idLocale })}</>
+                                            ) : (
+                                                format(dateRange.from, "dd MMM yyyy", { locale: idLocale })
+                                            )
+                                        ) : (
+                                            "Pilih rentang tanggal"
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="range" selected={dateRange} onSelect={setDateRange} />
+                                </PopoverContent>
+                            </Popover>
+                            <p className="text-[10px] text-muted-foreground">Kosongkan jika promo berlaku selamanya.</p>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Deskripsi (Opsional)</Label>
+                            <Input value={formData.description} onChange={(e) => setField('description', e.target.value)} placeholder="Keterangan singkat..." />
                         </div>
 
                         <div className="flex items-center space-x-2 pt-2">
-                            <Switch checked={data.is_active} onCheckedChange={(c) => setData('is_active', c)} />
+                            <Switch checked={formData.is_active} onCheckedChange={(c) => setField('is_active', c)} />
                             <Label>Status Aktif</Label>
                         </div>
                     </div>
 
                     <DialogFooter className="col-span-2 pt-4 border-t">
-                        <Button type="submit" disabled={processing}>{promotion ? 'Simpan' : 'Buat'}</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {promotion ? 'Simpan Perubahan' : 'Buat Promo'}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

@@ -255,7 +255,15 @@ function TransactionCreate({ customers, services, promotions }: {
 
     const discount = useMemo(() => {
         let disc = 0;
+        const checkEligibility = (p: Promotion) => {
+            if (p.min_amount && subtotal < parseFloat(p.min_amount)) return false;
+            if (p.min_weight && totalWeightKg < parseFloat(p.min_weight)) return false;
+            return true;
+        };
+
         const calculatePromoValue = (p: Promotion) => {
+            if (!checkEligibility(p)) return 0;
+            
             let baseVal = subtotal;
             if (p.service_id) {
                 const targetItems = cart.filter(i => i.serviceId === p.service_id);
@@ -264,21 +272,39 @@ function TransactionCreate({ customers, services, promotions }: {
             }
             return p.type === 'percentage' ? baseVal * (parseFloat(p.value) / 100) : parseFloat(p.value);
         };
+
         if (appliedPromo) disc += calculatePromoValue(appliedPromo);
+        
         promotions.filter(p => !p.code).forEach(p => {
-            if ((!p.min_amount || subtotal >= parseFloat(p.min_amount)) && (!p.min_weight || totalWeightKg >= parseFloat(p.min_weight))) {
-                disc += calculatePromoValue(p);
-            }
+            disc += calculatePromoValue(p);
         });
+        
         return Math.min(disc, subtotal);
     }, [cart, appliedPromo, subtotal, totalWeightKg, promotions]);
 
     const total = subtotal - discount;
 
     const applyPromoCode = () => {
+        if (!promoCode) {
+            setAppliedPromo(null);
+            return;
+        }
         const promo = promotions.find(p => p.code === promoCode.toUpperCase());
-        if (promo) { setAppliedPromo(promo); toast.success("Promo OK!"); }
-        else { toast.error("Promo Gagal!"); setAppliedPromo(null); }
+        if (promo) { 
+            let eligible = true;
+            let reason = "";
+            if (promo.min_amount && subtotal < parseFloat(promo.min_amount)) { eligible = false; reason = "Min. transaksi " + formatRupiah(parseFloat(promo.min_amount)); }
+            else if (promo.min_weight && totalWeightKg < parseFloat(promo.min_weight)) { eligible = false; reason = "Min. berat " + promo.min_weight + "kg"; }
+            
+            if (!eligible) {
+                toast.error("Belum memenuhi syarat: " + reason);
+                setAppliedPromo(null);
+            } else {
+                setAppliedPromo(promo); 
+                toast.success("Promo berhasil diterapkan!"); 
+            }
+        }
+        else { toast.error("Kode promo tidak ditemukan!"); setAppliedPromo(null); }
     };
 
     const handleCheckout = async () => {
@@ -392,6 +418,10 @@ function TransactionCreate({ customers, services, promotions }: {
                     </div>
 
                     <div className="p-4 border-t bg-background">
+                        <div className="flex gap-2 mb-4">
+                            <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-8 text-xs uppercase" />
+                            <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={applyPromoCode}>Pakai</Button>
+                        </div>
                         <div className="space-y-2 text-sm mb-4">
                             <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
                             {discount > 0 && <div className="flex justify-between text-emerald-600 font-bold"><span>Diskon</span><span>-{formatRupiah(discount)}</span></div>}
@@ -400,7 +430,7 @@ function TransactionCreate({ customers, services, promotions }: {
                         </div>
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-2 gap-1"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
-                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">QRIS</span></Button>
+                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans (Online)</span></Button>
                         </div>
                         <Button className="w-full h-12 font-bold text-lg" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
                     </div>

@@ -146,8 +146,12 @@ class TransactionController extends Controller
             'services' => Service::all(),
             'promotions' => Promotion::where('is_active', true)
                                    ->where(function($q) {
+                                       $q->whereNull('start_date')
+                                         ->orWhere('start_date', '<=', now()->toDateString());
+                                   })
+                                   ->where(function($q) {
                                        $q->whereNull('end_date')
-                                         ->orWhere('end_date', '>=', now());
+                                         ->orWhere('end_date', '>=', now()->toDateString());
                                    })->get(),
         ]);
     }
@@ -205,14 +209,30 @@ class TransactionController extends Controller
             $promosToCheck = [];
 
             if ($request->filled('promo_code')) {
-                $codePromo = Promotion::where('code', $request->promo_code)->first();
-                if ($codePromo) $promosToCheck[] = $codePromo;
+                $codePromo = Promotion::where('code', $request->promo_code)
+                    ->where('is_active', true)
+                    ->where(function($q) {
+                        $q->whereNull('start_date')->orWhere('start_date', '<=', now()->toDateString());
+                    })
+                    ->where(function($q) {
+                        $q->whereNull('end_date')->orWhere('end_date', '>=', now()->toDateString());
+                    })
+                    ->first();
+                
+                if ($codePromo) {
+                    $promosToCheck[] = $codePromo;
+                } else {
+                    throw new \Exception("Kode promo tidak valid, sudah kedaluwarsa, atau tidak aktif.");
+                }
             }
 
             $autoPromos = Promotion::whereNull('code')
                 ->where('is_active', true)
                 ->where(function($q) {
-                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                    $q->whereNull('start_date')->orWhere('start_date', '<=', now()->toDateString());
+                })
+                ->where(function($q) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', now()->toDateString());
                 })->get();
             
             foreach ($autoPromos as $p) $promosToCheck[] = $p;
