@@ -25,4 +25,15 @@ class Employee extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($employee) {
+            if (empty($employee->qr_token)) {
+                $employee->qr_token = \Illuminate\Support\Str::uuid()->toString();
+            }
+        });
+    }
 }

@@ -140,6 +140,9 @@ class EmployeeController extends Controller
     public function idCard($id)
     {
         $employee = Employee::with('user')->findOrFail($id);
+        if (empty($employee->qr_token)) {
+            $employee->update(['qr_token' => \Illuminate\Support\Str::uuid()->toString()]);
+        }
         return Inertia::render('Admin/Employees/IdCard', [
             'employee' => $employee
         ]);
@@ -159,6 +162,12 @@ class EmployeeController extends Controller
         }
 
         $employees = $query->get();
+
+        foreach ($employees as $employee) {
+            if (empty($employee->qr_token)) {
+                $employee->update(['qr_token' => \Illuminate\Support\Str::uuid()->toString()]);
+            }
+        }
 
         if ($employees->isEmpty()) {
             return redirect()->back()->with('message', 'Tidak ada data pegawai yang dipilih atau memenuhi syarat pencetakan.');
