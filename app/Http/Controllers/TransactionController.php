@@ -368,7 +368,7 @@ class TransactionController extends Controller
 
     public function show(Transaction $transaction)
     {
-        $transaction->load(['customer', 'user', 'details']);
+        $transaction->load(['customer.user', 'user', 'details']);
         return Inertia::render('Admin/Transactions/Show', [
             'transaction' => $transaction
         ]);

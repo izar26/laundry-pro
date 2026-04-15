@@ -19,7 +19,7 @@ type TransactionDetail = {
 type Transaction = {
     id: number;
     invoice_code: string;
-    customer: { name: string; phone: string; email: string | null; address: string | null };
+    customer: { user: { name: string }; phone: string; email: string | null; address: string | null };
     user: { name: string };
     total_amount: string;
     discount_amount: string;
@@ -96,7 +96,7 @@ function TransactionShow({ transaction }: { transaction: Transaction }) {
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{transaction.customer.name}</span>
+                                <span className="font-medium">{transaction.customer.user?.name || 'Pelanggan'}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
