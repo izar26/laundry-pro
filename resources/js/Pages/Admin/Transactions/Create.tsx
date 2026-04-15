@@ -325,10 +325,10 @@ function TransactionCreate({ customers, services, promotions }: {
             // Cek service_id — apakah layanan target ada di cart
             let baseVal = subtotal;
             if (p.service_id) {
-                const targetItems = cart.filter(i => i.serviceId === p.service_id);
+                const promoServiceId = Number(p.service_id);
+                const targetItems = cart.filter(i => i.serviceId === promoServiceId);
                 if (targetItems.length === 0) {
-                    // Cari nama layanan dari services prop
-                    const svc = services.find(s => s.id === p.service_id);
+                    const svc = services.find(s => s.id === promoServiceId);
                     ineligible.push({ 
                         promo: p, 
                         reason: `Khusus layanan "${svc?.name || 'tertentu'}" — belum ada di keranjang` 
@@ -394,7 +394,7 @@ function TransactionCreate({ customers, services, promotions }: {
             stillEligible = false;
             reason = `Berat di bawah minimum ${p.min_weight}kg`;
         } else if (p.service_id) {
-            const hasTarget = cart.some(i => i.serviceId === p.service_id);
+            const hasTarget = cart.some(i => i.serviceId === Number(p.service_id));
             if (!hasTarget) {
                 stillEligible = false;
                 reason = 'Layanan terkait dihapus dari keranjang';
@@ -432,9 +432,10 @@ function TransactionCreate({ customers, services, promotions }: {
             errors.push(`Min. berat ${promo.min_weight}kg (saat ini ${totalWeightKg}kg)`);
         }
         if (promo.service_id) {
-            const hasTarget = cart.some(i => i.serviceId === promo.service_id);
+            const promoServiceId = Number(promo.service_id);
+            const hasTarget = cart.some(i => i.serviceId === promoServiceId);
             if (!hasTarget) {
-                const svc = services.find(s => s.id === promo.service_id);
+                const svc = services.find(s => s.id === promoServiceId);
                 errors.push(`Khusus layanan "${svc?.name || 'tertentu'}" — tambahkan ke keranjang dulu`);
             }
         }
@@ -454,7 +455,7 @@ function TransactionCreate({ customers, services, promotions }: {
         // Hitung preview diskon
         let baseVal = subtotal;
         if (promo.service_id) {
-            baseVal = cart.filter(i => i.serviceId === promo.service_id).reduce((a, i) => a + i.price * i.qty, 0);
+            baseVal = cart.filter(i => i.serviceId === Number(promo.service_id)).reduce((a, i) => a + i.price * i.qty, 0);
         }
         const previewDiscount = promo.type === 'percentage' 
             ? baseVal * (parseFloat(promo.value) / 100) 
