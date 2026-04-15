@@ -222,9 +222,6 @@ class TransactionController extends Controller
                     ->first();
                 
                 if ($codePromo) {
-                    if (!is_null($codePromo->quota) && $codePromo->used_count >= $codePromo->quota) {
-                        throw new \Exception("Sisa kuota promo '{$codePromo->code}' sudah habis.");
-                    }
                     // Validasi service_id: jika promo khusus layanan tertentu, pastikan ada di cart
                     if ($codePromo->service_id) {
                         $hasTargetService = $cartCollection->where('service_id', $codePromo->service_id)->isNotEmpty();
@@ -259,7 +256,6 @@ class TransactionController extends Controller
                 $eligible = true;
                 if ($promo->min_amount && $totalAmount < $promo->min_amount) $eligible = false;
                 if ($promo->min_weight && $totalWeightKg < $promo->min_weight) $eligible = false;
-                if (!is_null($promo->quota) && $promo->used_count >= $promo->quota) $eligible = false;
 
                 if ($eligible) {
                     $baseCalculation = $totalAmount;

@@ -74,8 +74,6 @@ type Promotion = {
     end_date?: string | null;
     is_active?: boolean;
     description?: string | null;
-    quota?: number | null;
-    used_count?: number;
 };
 
 type CartItem = {
@@ -310,16 +308,6 @@ function TransactionCreate({ customers, services, promotions }: {
                 return;
             }
 
-            // Cek Quota
-            if (p.quota !== null && p.quota !== undefined && p.used_count !== undefined && p.used_count >= p.quota) {
-                ineligible.push({ 
-                    promo: p, 
-                    reason: `Batas kuota promo telah habis (${p.used_count}/${p.quota})`,
-                    progress: 100
-                });
-                return;
-            }
-
             // Cek min_weight — hanya cek jika promo ini memang bukan khusus layanan satuan
             // Promo dengan service_id (layanan spesifik) yang unit-nya bukan kg, 
             // TIDAK boleh gagal gara-gara min_weight terhadap berat global
@@ -411,9 +399,6 @@ function TransactionCreate({ customers, services, promotions }: {
                 stillEligible = false;
                 reason = 'Layanan terkait dihapus dari keranjang';
             }
-        } else if (p.quota !== null && p.quota !== undefined && p.used_count !== undefined && p.used_count >= p.quota) {
-            stillEligible = false;
-            reason = 'Kuota promo sudah habis';
         }
 
         if (!stillEligible && cart.length > 0) {
@@ -453,9 +438,6 @@ function TransactionCreate({ customers, services, promotions }: {
                 const svc = services.find(s => s.id === promoServiceId);
                 errors.push(`Khusus layanan "${svc?.name || 'tertentu'}" — tambahkan ke keranjang dulu`);
             }
-        }
-        if (promo.quota !== null && promo.quota !== undefined && promo.used_count !== undefined && promo.used_count >= promo.quota) {
-            errors.push(`Sisa kuota promo ini sudah habis (${promo.used_count}/${promo.quota})`);
         }
         if (cart.length === 0) {
             errors.push('Keranjang masih kosong');

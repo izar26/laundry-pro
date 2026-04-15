@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('promotions', function (Blueprint $table) {
-            $table->integer('quota')->nullable()->after('value')->comment('Limit penggunaan. Null jika tanpa limit.');
-            $table->integer('used_count')->default(0)->after('quota')->comment('Berapa kali promo ini telah dipakai.');
+            //
         });
     }
 
@@ -23,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('promotions', function (Blueprint $table) {
-            $table->dropColumn(['quota', 'used_count']);
+            //
         });
     }
 };
