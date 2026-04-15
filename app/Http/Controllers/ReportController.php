@@ -111,8 +111,8 @@ class ReportController extends Controller
 
         // 6. Target Progress (Bulanan)
         // Ambil dari Setting jika ada, default 50 Juta
-        // $targetRevenue = Setting::where('key', 'target_revenue_monthly')->value('value') ?? 50000000;
-        $targetRevenue = 50000000; // Hardcode dulu biar cepat
+        // Ambil dari Setting jika ada, default 50 Juta
+        $targetRevenue = Setting::where('key', 'target_revenue_monthly')->value('value') ?? 50000000;
         
         // Hitung pendapatan bulan ini (current month) terlepas dari filter tanggal
         $currentMonthRevenue = Transaction::whereMonth('created_at', Carbon::now()->month)

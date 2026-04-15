@@ -27,6 +27,7 @@ class SettingController extends Controller
             'app_logo' => 'nullable|image|max:2048', // Max 2MB
             'attendance_time_in' => 'nullable|string',
             'attendance_time_out' => 'nullable|string',
+            'target_revenue_monthly' => 'nullable|numeric|min:0',
         ]);
 
         // Update Teks
@@ -38,6 +39,9 @@ class SettingController extends Controller
         }
         if (isset($validated['attendance_time_out'])) {
             Setting::updateOrCreate(['key' => 'attendance_time_out'], ['value' => $validated['attendance_time_out']]);
+        }
+        if (isset($validated['target_revenue_monthly'])) {
+            Setting::updateOrCreate(['key' => 'target_revenue_monthly'], ['value' => $validated['target_revenue_monthly']]);
         }
 
         // Upload Logo

@@ -21,6 +21,7 @@ function SettingsIndex({ settings }: { settings: any }) {
         app_logo: null as File | null,
         attendance_time_in: settings.attendance_time_in || '08:00',
         attendance_time_out: settings.attendance_time_out || '17:00',
+        target_revenue_monthly: settings.target_revenue_monthly || '50000000',
     });
 
     const [logoPreview, setLogoPreview] = useState<string | null>(
@@ -168,6 +169,19 @@ function SettingsIndex({ settings }: { settings: any }) {
                                             readOnly={isOwner}
                                         />
                                     </div>
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t space-y-2">
+                                    <Label htmlFor="target_revenue_monthly">Target Omset Bulanan (Rp)</Label>
+                                    <Input 
+                                        id="target_revenue_monthly" 
+                                        type="number" 
+                                        value={data.target_revenue_monthly} 
+                                        onChange={(e) => setData('target_revenue_monthly', e.target.value)} 
+                                        readOnly={isOwner}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Digunakan untuk menghitung progres ketercapaian target di menu Laporan Keuangan.</p>
+                                    {(errors as any).target_revenue_monthly && <p className="text-xs text-destructive">{(errors as any).target_revenue_monthly}</p>}
                                 </div>
 
                                 {!isOwner && (
