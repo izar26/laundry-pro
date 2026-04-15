@@ -102,7 +102,7 @@
             <div><span>No:</span> <span>{{ $transaction->invoice_code }}</span></div>
             <div><span>Tgl:</span> <span>{{ $transaction->created_at->format('d/m/Y H:i') }}</span></div>
             <div><span>Plg:</span> <span>{{ $transaction->customer->user->name }}</span></div>
-            <div><span>Ksr:</span> <span>{{ $transaction->user->name }}</span></div>
+            <div><span>Ksr:</span> <span>{{ $transaction->user->name === 'Admin Sistem' ? 'Admin' : $transaction->user->name }}</span></div>
         </div>
 
         <div class="divider"></div>

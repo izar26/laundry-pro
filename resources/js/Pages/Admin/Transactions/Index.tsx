@@ -279,7 +279,7 @@ const TransactionsIndex = ({ transactions, kanbanData, stats, filters }: { trans
                 return (
                     <div className="flex items-center gap-2">
                         <div className="font-medium text-sm text-muted-foreground">
-                            {isCreatedByCustomer ? 'Pelanggan' : row.original.user?.name}
+                            {isCreatedByCustomer ? 'Pelanggan' : (row.original.user?.name === 'Admin Sistem' ? 'Admin' : row.original.user?.name)}
                         </div>
                     </div>
                 );

@@ -121,7 +121,7 @@ function TransactionShow({ transaction }: { transaction: Transaction }) {
                         <CardContent>
                             <div className="flex items-center gap-2 text-sm">
                                 <User className="h-4 w-4 text-muted-foreground" />
-                                <span>{transaction.user.name}</span>
+                                <span>{transaction.user.name === 'Admin Sistem' ? 'Admin' : transaction.user.name}</span>
                             </div>
                         </CardContent>
                     </Card>
