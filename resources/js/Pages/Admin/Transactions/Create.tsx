@@ -122,7 +122,7 @@ function RollingNumber({ value }: { value: number }) {
     );
 }
 
-function CartItemRow({ item, updateQty, removeItem, formatRupiah }: { item: CartItem, updateQty: (id: number, delta: number) => void, removeItem: (id: number) => void, formatRupiah: (val: number) => string }) {
+function CartItemRow({ item, updateQty, removeItem }: { item: CartItem, updateQty: (id: number, delta: number) => void, removeItem: (id: number) => void }) {
     const x = useMotionValue(0);
     const opacity = useTransform(x, [-100, 0], [0, 1]);
 
@@ -149,42 +149,28 @@ function CartItemRow({ item, updateQty, removeItem, formatRupiah }: { item: Cart
                 LEPAS UNTUK HAPUS <Trash className="ml-1 h-4 w-4" />
             </motion.div>
 
-            <div className="bg-background p-3.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 relative z-10">
-                {/* Row 1: Nama + Hapus */}
-                <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 mr-2">
-                        <div className="font-semibold text-[13px] leading-snug line-clamp-2" title={item.name}>{item.name}</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">{formatRupiah(item.price)} / {item.unit}</div>
-                    </div>
-                    <button 
-                        onClick={() => removeItem(item.serviceId)} 
-                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
-                    >
-                        <Trash className="h-3.5 w-3.5" />
-                    </button>
+            <div className="flex items-center justify-between bg-background p-3 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800 relative z-10">
+                <div className="flex-1 mr-2">
+                    <div className="font-medium text-sm line-clamp-1" title={item.name}>{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price)} / {item.unit}</div>
                 </div>
-                {/* Row 2: Qty controls + Subtotal */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center bg-muted rounded-lg h-9 shadow-inner">
-                        <button onClick={() => updateQty(item.serviceId, -0.5)} className="w-9 h-full flex items-center justify-center hover:bg-background rounded-l-lg transition-colors text-muted-foreground hover:text-foreground active:scale-90">
-                            <Minus className="h-3.5 w-3.5" />
-                        </button>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-muted rounded-md h-8 shadow-inner">
+                        <button onClick={() => updateQty(item.serviceId, -0.5)} className="w-8 h-full flex items-center justify-center hover:bg-background rounded-l-md transition-colors text-muted-foreground hover:text-foreground active:scale-90"><Minus className="h-3 w-3" /></button>
                         <motion.span 
                             key={item.qty}
-                            initial={{ scale: 1.3 }}
+                            initial={{ scale: 1.2 }}
                             animate={{ scale: 1 }}
-                            className="text-sm font-bold font-mono w-10 text-center"
+                            className="text-sm font-mono w-8 text-center"
                         >
                             {item.qty}
                         </motion.span>
-                        <button onClick={() => updateQty(item.serviceId, 0.5)} className="w-9 h-full flex items-center justify-center hover:bg-background rounded-r-lg transition-colors text-muted-foreground hover:text-foreground active:scale-90">
-                            <Plus className="h-3.5 w-3.5" />
-                        </button>
+                        <button onClick={() => updateQty(item.serviceId, 0.5)} className="w-8 h-full flex items-center justify-center hover:bg-background rounded-r-md transition-colors text-muted-foreground hover:text-foreground active:scale-90"><Plus className="h-3 w-3" /></button>
                     </div>
-                    <div className="text-right">
-                        <div className="font-bold text-sm text-foreground">
-                            {formatRupiah(item.price * item.qty)}
-                        </div>
+                </div>
+                <div className="text-right min-w-[70px] ml-2">
+                    <div className="font-semibold text-sm">
+                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price * item.qty)}
                     </div>
                 </div>
             </div>
@@ -528,11 +514,14 @@ function TransactionCreate({ customers, services, promotions }: {
                                     <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key={service.id}>
                                         <SpotlightCard className="cursor-pointer hover:border-primary transition-all group">
                                             <div onClick={() => addToCart(service)}>
-                                                <CardHeader className="p-4 pb-2">
+                                                <CardHeader className="p-4 pb-1">
                                                     <div className="flex justify-between items-start">
                                                         <CardTitle className="text-base group-hover:text-primary line-clamp-1">{service.name}</CardTitle>
                                                         <Badge variant="secondary" className="text-[10px]">/{service.unit}</Badge>
                                                     </div>
+                                                    {service.description && (
+                                                        <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{service.description}</p>
+                                                    )}
                                                 </CardHeader>
                                                 <CardFooter className="p-4 pt-0 mt-2 flex justify-between items-center">
                                                     <span className="font-bold">{formatRupiah(parseFloat(service.price))}</span>
@@ -574,40 +563,36 @@ function TransactionCreate({ customers, services, promotions }: {
                         )}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/20">
-                        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} formatRupiah={formatRupiah} />)}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50 dark:bg-slate-900/20">
+                        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30"><ShoppingCart className="h-12 w-12 mb-2" /><p>Kosong</p></div> : cart.map(item => <CartItemRow key={item.serviceId} item={item} updateQty={updateQty} removeItem={removeItem} />)}
                     </div>
 
-                    <div className="p-4 border-t bg-background space-y-3">
+                    <div className="p-3 border-t bg-background space-y-2">
                         {/* Input Kode Promo */}
                         {appliedPromo ? (
-                            <motion.div 
-                                initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
-                            >
-                                <TicketPercent className="h-4 w-4 text-emerald-600 shrink-0" />
+                            <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-md px-2.5 py-1.5">
+                                <TicketPercent className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate">{appliedPromo.name}</div>
-                                    <div className="text-[10px] text-emerald-600/70 dark:text-emerald-500/70 font-mono">{appliedPromo.code}</div>
+                                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 truncate block">{appliedPromo.name}</span>
                                 </div>
-                                <button onClick={removePromoCode} className="p-1 hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 rounded transition-colors">
-                                    <X className="h-3.5 w-3.5 text-emerald-600" />
+                                <button onClick={removePromoCode} className="p-0.5 hover:bg-emerald-200/50 rounded transition-colors">
+                                    <X className="h-3 w-3 text-emerald-600" />
                                 </button>
-                            </motion.div>
+                            </div>
                         ) : (
                             <div className="flex gap-2">
-                                <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-8 text-xs uppercase font-mono" />
-                                <Button variant="secondary" size="sm" className="h-8 text-xs shrink-0" onClick={applyPromoCode} disabled={!promoCode.trim()}>Pakai</Button>
+                                <Input placeholder="Kode Promo" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="h-7 text-xs uppercase font-mono" />
+                                <Button variant="secondary" size="sm" className="h-7 text-[10px] shrink-0 px-2.5" onClick={applyPromoCode} disabled={!promoCode.trim()}>Pakai</Button>
                             </div>
                         )}
 
                         {/* Breakdown Diskon */}
-                        <div className="space-y-1.5 text-sm">
-                            <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
+                        <div className="space-y-1 text-sm">
+                            <div className="flex justify-between text-muted-foreground text-xs"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
                             
-                            {/* Promo yang terapply — breakdown per item */}
+                            {/* Promo yang terapply */}
                             <AnimatePresence>
-                                {discountInfo.applied.map((info, idx) => (
+                                {discountInfo.applied.map((info) => (
                                     <motion.div 
                                         key={`applied-${info.promo.id}`}
                                         initial={{ opacity: 0, height: 0 }}
@@ -616,30 +601,28 @@ function TransactionCreate({ customers, services, promotions }: {
                                         className="overflow-hidden"
                                     >
                                         <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                            <span className="flex items-center gap-1.5 text-xs">
-                                                {info.isCode ? <Tag className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-                                                <span className="truncate max-w-[140px]" title={info.promo.name}>{info.promo.name}</span>
-                                                <Badge variant="outline" className="text-[9px] py-0 h-4 border-emerald-300 dark:border-emerald-700 text-emerald-600">{info.label}</Badge>
+                                            <span className="flex items-center gap-1 text-[11px]">
+                                                {info.isCode ? <Tag className="h-2.5 w-2.5" /> : <Sparkles className="h-2.5 w-2.5" />}
+                                                <span className="truncate max-w-[130px]">{info.promo.name}</span>
+                                                <span className="text-[9px] opacity-70">({info.label})</span>
                                             </span>
-                                            <span className="font-bold text-xs">-{formatRupiah(info.amount)}</span>
+                                            <span className="font-bold text-[11px]">-{formatRupiah(info.amount)}</span>
                                         </div>
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
 
-                            {/* Total diskon summary jika ada > 1 promo */}
                             {discountInfo.applied.length > 1 && (
-                                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-bold text-xs pt-0.5 border-t border-dashed border-emerald-200 dark:border-emerald-800">
-                                    <span>Total Diskon</span>
-                                    <span>-{formatRupiah(discount)}</span>
+                                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-bold text-[11px] pt-0.5 border-t border-dashed border-emerald-200 dark:border-emerald-800">
+                                    <span>Total Diskon</span><span>-{formatRupiah(discount)}</span>
                                 </div>
                             )}
 
                             <Separator />
-                            <div className="flex justify-between text-xl font-bold pt-1"><span>Total</span><span className="text-primary"><RollingNumber value={total} /></span></div>
+                            <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-primary"><RollingNumber value={total} /></span></div>
                         </div>
 
-                        {/* Hints: Promo yang belum memenuhi syarat */}
+                        {/* Hints: Promo yang belum memenuhi syarat — compact, max 2 items */}
                         <AnimatePresence>
                             {cart.length > 0 && discountInfo.ineligible.length > 0 && (
                                 <motion.div 
@@ -648,30 +631,14 @@ function TransactionCreate({ customers, services, promotions }: {
                                     exit={{ opacity: 0, height: 0 }}
                                     className="overflow-hidden"
                                 >
-                                    <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-lg p-2.5 space-y-2">
-                                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                                            <Info className="h-3.5 w-3.5 shrink-0" />
-                                            <span className="text-[10px] font-bold uppercase tracking-wide">Promo Hampir Tercapai</span>
-                                        </div>
-                                        {discountInfo.ineligible.map((info) => (
-                                            <div key={`hint-${info.promo.id}`} className="space-y-1">
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300 truncate max-w-[180px]" title={info.promo.name}>{info.promo.name}</span>
-                                                    <span className="text-[10px] text-amber-600 dark:text-amber-500">
-                                                        {info.promo.type === 'percentage' ? `${parseFloat(info.promo.value)}%` : formatRupiah(parseFloat(info.promo.value))}
-                                                    </span>
+                                    <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-md p-2 space-y-1.5 max-h-[72px] overflow-y-auto">
+                                        {discountInfo.ineligible.slice(0, 3).map((info) => (
+                                            <div key={`hint-${info.promo.id}`} className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <Info className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                                                    <span className="text-[10px] text-amber-700 dark:text-amber-400 truncate">{info.promo.name}</span>
                                                 </div>
-                                                <div className="text-[10px] text-amber-600/80 dark:text-amber-500/80">{info.reason}</div>
-                                                {info.progress !== undefined && (
-                                                    <div className="w-full bg-amber-200/50 dark:bg-amber-900/30 rounded-full h-1">
-                                                        <motion.div 
-                                                            className="bg-amber-500 dark:bg-amber-400 h-1 rounded-full"
-                                                            initial={{ width: 0 }}
-                                                            animate={{ width: `${info.progress}%` }}
-                                                            transition={{ duration: 0.5, ease: 'easeOut' }}
-                                                        />
-                                                    </div>
-                                                )}
+                                                <span className="text-[9px] text-amber-600/70 dark:text-amber-500/70 shrink-0 whitespace-nowrap">{info.reason.split('(')[1]?.replace(')', '') || ''}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -681,10 +648,10 @@ function TransactionCreate({ customers, services, promotions }: {
 
                         {/* Payment Method */}
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-2 gap-1"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
-                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-2 gap-1"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans (Online)</span></Button>
+                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="flex-col h-auto py-1.5 gap-0.5"><Banknote className="h-4 w-4" /><span className="text-[10px]">Tunai</span></Button>
+                            <Button variant={paymentMethod === 'midtrans' ? 'default' : 'outline'} onClick={() => setPaymentMethod('midtrans')} className="flex-col h-auto py-1.5 gap-0.5"><CreditCard className="h-4 w-4" /><span className="text-[10px]">Midtrans</span></Button>
                         </div>
-                        <Button className="w-full h-12 font-bold text-lg" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
+                        <Button className="w-full h-10 font-bold text-base" disabled={isProcessing || cart.length === 0 || !selectedCustomer} onClick={handleCheckout}>{isProcessing ? <Loader2 className="animate-spin" /> : "Bayar"}</Button>
                     </div>
                 </div>
             </div>
